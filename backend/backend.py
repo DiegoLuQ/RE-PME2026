@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from pydantic import BaseModel, Field, BeforeValidator
+from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
 from typing import List, Optional, Annotated
 from datetime import datetime
 from bson import ObjectId
@@ -53,7 +53,7 @@ app.add_middleware(
 # 2. UTILIDADES Y ESQUEMAS (ADAPTADO PYDANTIC V2)
 # ==========================================
 
-# Lógica para convertir ObjectId a String automáticamente en los modelos
+# Lógica moderna para convertir ObjectId a String automáticamente
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
 # --- Esquemas Generales ---
@@ -79,9 +79,10 @@ class SchemaColegio(BaseModel):
     director: Optional[str] = None
     imagen: Optional[str] = None
 
-    class Config:
-        populate_by_name = True # Reemplaza a allow_population_by_field_name en v2
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
 
 # --- Esquemas PME ---
 class Schema_PME(BaseModel):
@@ -91,9 +92,10 @@ class Schema_PME(BaseModel):
     director: str
     observacion: str
     
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
 
 class Schema_PME_Create(BaseModel):
     year: int
@@ -124,9 +126,10 @@ class Schema_Acciones(BaseModel):
     monto_total: int = 0
     fecha_actualizacion: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
 
 # --- Esquemas Recursos ---
 class Schema_Recursos(BaseModel):
@@ -144,9 +147,10 @@ class Schema_Recursos(BaseModel):
     year: int
     fecha: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        populate_by_name = True
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True,
+    )
 
 # ==========================================
 # 3. ENDPOINTS
@@ -178,7 +182,8 @@ def create_colegio(col: SchemaColegio):
     if col_colegios.find_one({"nombre": col.nombre}):
         raise HTTPException(status_code=400, detail="Nombre de colegio ya existe")
     
-    new_col = col.model_dump(by_alias=True, exclude={"id"}) # model_dump es el nuevo .dict()
+    # En V2 usamos model_dump en vez de dict()
+    new_col = col.model_dump(by_alias=True, exclude={"id"}) 
     new_col["_id"] = str(ObjectId())
     
     col_colegios.insert_one(new_col)
@@ -204,7 +209,6 @@ def create_pme(pme: Schema_PME_Create):
     if col_pme.find_one({"id_colegio": pme.id_colegio, "year": pme.year}):
         raise HTTPException(status_code=400, detail="El PME ya existe")
     
-    # model_dump en v2
     new_pme = pme.model_dump(exclude={"clonar"})
     new_pme["_id"] = str(ObjectId())
     col_pme.insert_one(new_pme)
@@ -242,7 +246,6 @@ def create_pme(pme: Schema_PME_Create):
 @app.post("/api/pme/clonar")
 def clonar_pme_anio_anterior(datos: SchemaClonacion):
     try:
-        # PME Destino (Buscamos por ID string, si falla intentamos ObjectId)
         pme_destino = col_pme.find_one({"_id": datos.id_pme_destino})
         if not pme_destino:
              pme_destino = col_pme.find_one({"_id": ObjectId(datos.id_pme_destino)})
@@ -516,4 +519,5 @@ if not col_users.find_one({"perfil": "usuario"}):
 
 if __name__ == "__main__":
     import uvicorn
+    # Se usa el puerto 8000 dentro del contenedor
     uvicorn.run(app, host="0.0.0.0", port=8000)
