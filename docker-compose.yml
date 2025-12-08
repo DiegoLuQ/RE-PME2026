@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # --- BACKEND PYTHON ---
+  pme_new_backend:
+    build:
+      context: ./backend
+    container_name: pme_new_backend
+    restart: always
+    ports:
+      # Usamos variable para el puerto externo
+      - "${PORT_BACKEND}:8000"
+    environment:
+      # Pasamos las variables del .env al contenedor
+      - MONGO_URI=${MONGO_URI}
+      - DB_NAME=${DB_NAME}
+    networks:
+      - red_pme_nueva
+
+  # --- FRONTEND HTML ---
+  pme_new_frontend:
+    build:
+      context: ./frontend
+    container_name: pme_new_frontend
+    restart: always
+    ports:
+      # Usamos variable para el puerto externo
+      - "${PORT_FRONTEND}:80"
+    depends_on:
+      - pme_new_backend
+    networks:
+      - red_pme_nueva
+
+networks:
+  red_pme_nueva:
+    driver: bridge  

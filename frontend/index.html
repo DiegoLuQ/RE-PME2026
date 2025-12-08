@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orquestador PME 2025</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+      /* Utilidades de vista */
+      .hidden-section {
+        display: none;
+      }
+      .active-link {
+        background-color: #1f2937;
+        color: white;
+        border-right: 4px solid #3b82f6;
+      }
+
+      /* SEGURIDAD: Ocultar para usuarios normales */
+      .admin-only {
+        display: none !important;
+      }
+
+      /* SEGURIDAD: Mostrar solo si es admin */
+      body.is-admin .admin-only {
+        display: inline-flex !important;
+      }
+      body.is-admin div.admin-only {
+        display: block !important;
+      }
+
+      /* Efectos visuales */
+      .blur-back {
+        filter: blur(5px);
+        pointer-events: none;
+      }
+      .modal-enter {
+        animation: fadeIn 0.3s ease-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+
+  <body class="bg-gray-100 font-sans h-screen flex overflow-hidden">
+    <!-- 1. MODAL LOGIN (CORREGIDO: AHORA ESTÁ DENTRO DEL BODY) -->
+    <div
+      id="modal-login"
+      class="fixed inset-0 bg-gray-900 z-[100] flex justify-center items-center"
+    >
+      <div
+        class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center"
+      >
+        <div class="mb-6">
+          <div
+            class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <span class="text-3xl">🔒</span>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-800">Acceso Seguro PME</h2>
+          <p class="text-gray-500 text-sm">Identifícate para continuar</p>
+        </div>
+
+        <form onsubmit="realizarLogin(event)" class="space-y-4">
+          <div>
+            <input
+              type="text"
+              id="login-perfil"
+              placeholder="Perfil (usuario / administrador)"
+              class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              id="login-pass"
+              placeholder="Contraseña"
+              class="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-center"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition transform hover:scale-105"
+          >
+            Ingresar
+          </button>
+        </form>
+        <p id="login-error" class="text-red-500 text-sm mt-4 font-bold"></p>
+      </div>
+    </div>
+
+    <!-- 2. SIDEBAR -->
+    <aside
+      id="sidebar"
+      class="w-64 bg-gray-900 text-gray-300 flex flex-col shadow-2xl z-20 transition-all duration-300 relative"
+    >
+      <button
+        onclick="toggleSidebar()"
+        class="absolute -right-3 top-6 bg-blue-600 text-white p-1 rounded-full shadow-lg hover:bg-blue-500 z-50"
+      >
+        <svg
+          id="toggle-icon"
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          ></path>
+        </svg>
+      </button>
+
+      <div
+        class="p-6 text-center border-b border-gray-700 bg-gray-800 overflow-hidden whitespace-nowrap"
+      >
+        <h1 class="font-bold text-2xl text-white tracking-wider sidebar-text">
+          Orquestador<br /><span class="text-blue-500">PME</span>
+        </h1>
+        <h1 class="font-bold text-2xl text-blue-500 hidden sidebar-icon">
+          PME
+        </h1>
+      </div>
+
+      <nav class="flex-1 p-4 space-y-2 overflow-y-auto overflow-x-hidden">
+        <p
+          class="text-xs uppercase text-gray-500 font-semibold mb-2 ml-2 sidebar-text"
+        >
+          Principal
+        </p>
+
+        <button
+          onclick="navTo('dashboard')"
+          id="nav-dashboard"
+          class="w-full text-left px-4 py-3 rounded hover:bg-gray-700 transition-colors flex items-center gap-3 active-link group"
+          title="Dashboard"
+        >
+          <span class="text-xl">📊</span>
+          <span class="sidebar-text group-hover:text-white">Dashboard</span>
+        </button>
+
+        <button
+          onclick="navTo('acciones')"
+          id="nav-acciones"
+          class="w-full text-left px-4 py-3 rounded hover:bg-gray-700 transition-colors flex items-center gap-3 group"
+          title="Gestión Acciones"
+        >
+          <span class="text-xl">🚀</span>
+          <span class="sidebar-text group-hover:text-white">Acciones</span>
+        </button>
+
+        <button
+          onclick="navTo('gestion-recursos')"
+          id="nav-gestion-recursos"
+          class="w-full text-left px-4 py-3 rounded hover:bg-gray-700 transition-colors flex items-center gap-3 group"
+          title="Recursos Globales"
+        >
+          <span class="text-xl">📦</span>
+          <span class="sidebar-text group-hover:text-white"
+            >Recursos (Global)</span
+          >
+        </button>
+        <button
+          onclick="navTo('gestion-pme')"
+          id="nav-gestion-pme"
+          class="w-full text-left px-4 py-3 rounded hover:bg-gray-700 transition-colors flex items-center gap-3 group"
+          title="Administrar Años PME"
+        >
+          <span class="text-xl">📅</span>
+          <span class="sidebar-text group-hover:text-white">Gestión PMEs</span>
+        </button>
+
+        <!-- MENÚ MANTENCIÓN -->
+        <div class="pt-4 border-t border-gray-700 mt-4">
+          <button
+            onclick="toggleMantencion()"
+            class="w-full text-left px-4 py-2 rounded hover:bg-gray-800 transition-colors flex items-center justify-between group text-gray-400 hover:text-white"
+          >
+            <div class="flex items-center gap-3">
+              <span class="text-xl">🛠️</span>
+              <span class="sidebar-text">Mantención</span>
+            </div>
+            <span class="text-xs sidebar-text" id="arrow-mantencion">▼</span>
+          </button>
+          <div
+            id="submenu-mantencion"
+            class="hidden pl-4 mt-1 space-y-1 bg-gray-800/50 rounded-lg py-2"
+          >
+            <button
+              onclick="abrirConfigColumnas('acciones')"
+              class="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded flex gap-2 items-center"
+            >
+              <span>📋</span> <span class="sidebar-text">Tabla Acciones</span>
+            </button>
+            <button
+              onclick="abrirConfigColumnas('recursos')"
+              class="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded flex gap-2 items-center"
+            >
+              <span>🧱</span> <span class="sidebar-text">Tabla Recursos</span>
+            </button>
+            <!-- NUEVO BOTÓN: DATOS CERTIFICADO -->
+    <button onclick="abrirConfigColumnas('certificado')" class="w-full text-left px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded flex gap-2 items-center">
+        <span>📜</span> <span class="sidebar-text">Datos Certificado</span>
+    </button>
+
+          </div>
+        </div>
+      </nav>
+
+      <div
+        class="p-4 bg-gray-800 border-t border-gray-700 whitespace-nowrap overflow-hidden"
+      >
+        <p class="text-xs text-gray-400 mb-1 sidebar-text">Contexto Actual:</p>
+        <div
+          class="font-bold text-white truncate sidebar-text"
+          id="ctx-colegio"
+        >
+          ---
+        </div>
+        <div class="text-sm text-blue-400 font-mono sidebar-text" id="ctx-year">
+          ---
+        </div>
+        <div class="mt-3 pt-3 border-t border-gray-700 sidebar-text">
+          <p class="text-xs text-gray-500 uppercase">Perfil:</p>
+          <span
+            id="ctx-perfil"
+            class="font-bold text-yellow-400 uppercase text-xs"
+            >Desconectado</span
+          >
+        </div>
+      </div>
+    </aside>
+
+    <!-- 3. ÁREA PRINCIPAL -->
+    <main class="flex-1 overflow-y-auto bg-gray-100 p-8 relative">
+      <!-- VISTA 1: DASHBOARD -->
+      <section id="view-dashboard" class="max-w-4xl mx-auto">
+        <h2 class="text-4xl font-extrabold text-gray-800 mb-8 border-b pb-4">
+          Configuración de Contexto
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div
+            class="bg-white p-8 rounded-xl shadow-lg border border-gray-200 relative"
+          >
+            <h3
+              class="text-xl font-bold text-gray-700 mb-6 flex items-center gap-2"
+            >
+              <span class="bg-blue-100 text-blue-600 p-2 rounded-full text-sm"
+                >1</span
+              >
+              Seleccionar Colegio
+            </h3>
+            <div class="flex gap-2 mb-6">
+              <select
+                id="sel-colegios"
+                class="w-full border-gray-300 border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50"
+              >
+                <option value="">Cargando lista...</option>
+              </select>
+              <!-- Botón seguro: Solo admin -->
+              <button
+                onclick="modalCrearColegio()"
+                class="admin-only bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 rounded-lg font-bold text-xl"
+              >
+                +
+              </button>
+            </div>
+
+            <h3
+              class="text-xl font-bold text-gray-700 mb-6 flex items-center gap-2"
+            >
+              <span class="bg-blue-100 text-blue-600 p-2 rounded-full text-sm"
+                >2</span
+              >
+              Seleccionar Año
+            </h3>
+            <input
+              type="number"
+              id="sel-year"
+              value="2025"
+              class="w-full border-gray-300 border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-gray-50 mb-4 font-mono text-lg"
+            />
+
+            <div
+              id="pme-alert-box"
+              class="hidden-section mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-r"
+            >
+              <div class="flex justify-between items-center">
+                <div>
+                  <p class="font-bold text-yellow-800">No existe PME</p>
+                  <p class="text-sm text-yellow-700">
+                    No hay registros para este colegio.
+                  </p>
+                </div>
+                <!-- Botón seguro: Solo admin -->
+                <button
+                  onclick="abrirModalPME()"
+                  class="admin-only bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow font-bold text-sm"
+                >
+                  Crear Nuevo PME?
+                </button>
+              </div>
+            </div>
+
+            <button
+              onclick="establecerContexto()"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:-translate-y-1"
+            >
+              Comenzar a Trabajar
+            </button>
+            <p
+              id="dashboard-msg"
+              class="mt-4 text-center text-sm font-medium h-6"
+            ></p>
+          </div>
+
+          <div
+            class="bg-gradient-to-br from-blue-500 to-indigo-600 p-8 rounded-xl shadow-lg text-white flex flex-col justify-center items-center text-center"
+          >
+            <div class="text-6xl mb-4">🏫</div>
+            <h3 class="text-2xl font-bold mb-2">Bienvenido Director</h3>
+            <p class="opacity-90">
+              Selecciona un establecimiento y un año fiscal para comenzar la
+              orquestación del PME.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VISTA 2: ACCIONES -->
+      <section id="view-acciones" class="hidden-section">
+        <div
+          class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4"
+        >
+          <div>
+            <h2 class="text-3xl font-bold text-gray-800">Acciones del PME</h2>
+            <p class="text-gray-500 text-sm mt-1">
+              Gestión estratégica y planificación
+            </p>
+          </div>
+          <div class="flex gap-2">
+            <!-- Botón Público -->
+            <button
+              onclick="descargarExcelAcciones()"
+              class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-lg shadow-lg font-bold flex items-center gap-2 transition transform hover:-translate-y-1"
+              title="Descargar reporte general"
+            >
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                ></path>
+              </svg>
+              <span class="hidden sm:inline">Exportar Excel</span>
+            </button>
+            <!-- Botones Admin -->
+            <button
+              onclick="abrirModalImportar()"
+              class="admin-only bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg shadow-lg font-bold flex items-center gap-2 transition transform hover:-translate-y-1"
+              title="Carga masiva desde Excel"
+            >
+              <span>📂</span>
+              <span class="hidden sm:inline">Importar Excel</span>
+            </button>
+            <button
+              onclick="abrirModalAccion()"
+              class="admin-only bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-lg font-bold flex items-center gap-2 transition transform hover:-translate-y-1"
+              title="Crear manualmente"
+            >
+              <span>+</span> <span class="hidden sm:inline">Nueva Acción</span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex gap-4 items-center"
+        >
+          <span class="text-gray-400 text-xl">🔍</span>
+          <input
+            type="text"
+            id="filtro-nombre"
+            onkeyup="filtrarTabla()"
+            placeholder="Buscar acción por nombre..."
+            class="flex-1 outline-none text-gray-700 bg-transparent text-lg"
+          />
+          <div class="h-6 w-px bg-gray-300 mx-2"></div>
+          <select
+            id="filtro-dimension"
+            onchange="filtrarTabla()"
+            class="outline-none text-gray-600 bg-transparent font-medium cursor-pointer"
+          >
+            <option value="">Todas las Dimensiones</option>
+            <option value="Gestión Pedagógica">Gestión Pedagógica</option>
+            <option value="Liderazgo">Liderazgo</option>
+            <option value="Convivencia Escolar">Convivencia Escolar</option>
+            <option value="Gestión de Recursos">Gestión de Recursos</option>
+          </select>
+        </div>
+
+        <div
+          class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200"
+        >
+          <table class="w-full text-left border-collapse">
+            <thead
+              class="bg-gray-100 text-gray-600 uppercase text-xs tracking-wider"
+            >
+              <tr>
+                <!-- Headers JS -->
+              </tr>
+            </thead>
+            <tbody id="tabla-acciones" class="text-sm"></tbody>
+          </table>
+          <div
+            id="loading-acciones"
+            class="hidden-section p-8 text-center text-gray-500 animate-pulse"
+          >
+            Cargando datos...
+          </div>
+        </div>
+      </section>
+
+      <!-- VISTA 3: RECURSOS -->
+      <section id="view-recursos" class="hidden-section">
+        <div class="flex items-center gap-4 mb-8">
+          <button
+            onclick="navTo('acciones')"
+            class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg shadow-sm font-bold transition"
+          >
+            ← Volver
+          </button>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800">
+              Actividades y Recursos
+            </h2>
+            <p class="text-sm text-gray-500">
+              Detalle operativo de la acción seleccionada
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="bg-indigo-50 border-l-4 border-indigo-500 p-6 rounded-r-lg shadow-sm mb-8"
+        >
+          <h3 class="text-indigo-900 font-bold text-lg" id="rec-titulo-accion">
+            Cargando...
+          </h3>
+          <div class="flex gap-6 mt-2 text-sm text-indigo-700">
+            <p>
+              <strong>UUID:</strong>
+              <span id="rec-uuid-accion" class="font-mono">...</span>
+            </p>
+            <p>
+              <strong>Dimensión:</strong> <span id="rec-dim-accion">...</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex justify-end mb-4 gap-2">
+          <!-- NUEVO BOTÓN EXPORTAR DETALLE -->
+          <button
+            onclick="abrirModalExportarAccion()"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg shadow font-bold flex items-center gap-2"
+          >
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              ></path>
+            </svg>
+            Exportar Excel
+          </button>
+
+          <!-- Botón Agregar Actividad (Ya existía) -->
+          <button
+            onclick="abrirModalRecurso()"
+            class="admin-only bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-lg shadow font-bold flex items-center gap-2"
+          >
+            <span>⚡</span> Agregar Actividad
+          </button>
+        </div>
+
+        <div
+          class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200"
+        >
+          <table class="w-full text-left border-collapse">
+            <thead
+              class="bg-gray-50 text-gray-600 uppercase text-xs tracking-wider"
+            >
+              <tr>
+                <th class="p-4 border-b">Actividad</th>
+                <th class="p-4 border-b w-1/3">Recursos / Insumos</th>
+                <th class="p-4 border-b">Responsable</th>
+                <th class="p-4 border-b">Monto</th>
+                <th class="p-4 border-b text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-recursos" class="text-sm text-gray-700"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- VISTA 4: GLOBAL -->
+      <section id="view-gestion-recursos" class="hidden-section">
+        <div
+          class="mb-6 flex flex-col md:flex-row justify-between items-end gap-4"
+        >
+          <div>
+            <h2 class="text-3xl font-bold text-gray-800">Inventario Global</h2>
+            <p class="text-gray-500 text-sm mt-1">
+              Actividades del PME.
+            </p>
+          </div>
+        </div>
+
+          <!-- BARRA DE HERRAMIENTAS MEJORADA -->
+<div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4 items-center">
+    
+    <!-- Ícono -->
+    <span class="text-gray-400 text-xl hidden md:block">🔍</span>
+
+    <!-- GRUPO DE FILTROS -->
+    <div class="flex-1 flex w-full border rounded-lg overflow-hidden bg-gray-50 focus-within:ring-2 focus-within:ring-indigo-500">
+        
+        <!-- 1. SELECTOR DE CAMPO -->
+        <select id="tipo-filtro-global" onchange="filtrarTablaRecursosGlobal()" 
+                class="bg-gray-100 text-gray-700 font-bold px-3 py-2 outline-none border-r border-gray-300 cursor-pointer text-sm">
+            <option value="todos">Todo (Global)</option>
+            <option value="actividad">Actividad</option>
+            <option value="recursos">Recursos / Insumos</option>
+            <option value="desc_actividad">Desc. Actividad</option>
+            <option value="accion">Acción Asociada</option>
+            <option value="desc_accion">Desc. Acción</option>
+        </select>
+
+        <!-- 2. INPUT DE TEXTO -->
+        <input type="text" id="filtro-recurso-global" onkeyup="filtrarTablaRecursosGlobal()" 
+               placeholder="Escribe para buscar..." 
+               class="flex-1 px-4 py-2 outline-none bg-white text-gray-700 placeholder-gray-400">
+    </div>
+
+    <!-- BOTONES DE ACCIÓN (Exportar / Subir) -->
+    <div class="flex gap-2 w-full md:w-auto justify-end">
+        <button onclick="abrirModalExportarRecursos()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow flex items-center gap-2 transition transform hover:-translate-y-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <span class="hidden sm:inline">Exportar</span>
+        </button>
+        <button onclick="abrirModalImportarRecursos()" class="admin-only bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg font-bold shadow flex items-center gap-2 transition transform hover:-translate-y-1">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            <span class="hidden sm:inline">Subir Excel</span>
+        </button>
+    </div>
+</div>
+
+        <div
+          class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200"
+        >
+          <table class="w-full text-left border-collapse">
+            <thead
+              class="bg-gray-800 text-gray-300 uppercase text-xs tracking-wider"
+            >
+              <tr>
+                <!-- Headers JS -->
+              </tr>
+            </thead>
+            <tbody
+              id="tabla-recursos-global"
+              class="text-sm text-gray-700"
+            ></tbody>
+          </table>
+          <div
+            id="loading-recursos-global"
+            class="hidden-section p-8 text-center text-gray-500 animate-pulse"
+          >
+            Cargando inventario...
+          </div>
+        </div>
+      </section>
+      <section id="view-gestion-pme" class="hidden-section">
+        <div class="flex justify-between items-center mb-8">
+          <div>
+            <h2 class="text-3xl font-bold text-gray-800">
+              Administración de PME
+            </h2>
+            <p class="text-gray-500 text-sm mt-1">
+              Historial, creación y eliminación de años fiscales.
+            </p>
+          </div>
+          <!-- Botón Crear (Abre el modal limpio) -->
+          <button
+            onclick="prepararCrearPME()"
+            class="admin-only bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-lg shadow-lg font-bold flex items-center gap-2 transition transform hover:-translate-y-1"
+          >
+            <span>+</span> Nuevo Año PME
+          </button>
+        </div>
+
+        <div
+          class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200"
+        >
+          <table class="w-full text-left border-collapse">
+            <thead
+              class="bg-gray-800 text-gray-300 uppercase text-xs tracking-wider"
+            >
+              <tr>
+                <th class="p-4 border-b w-24 text-center">Año</th>
+                <th class="p-4 border-b">Director</th>
+                <th class="p-4 border-b">Observación</th>
+                <th class="p-4 border-b text-center w-64">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-pmes" class="text-sm text-gray-700">
+              <!-- JS Llenará esto -->
+            </tbody>
+          </table>
+          <div
+            id="loading-pmes"
+            class="hidden-section p-8 text-center text-gray-500 animate-pulse"
+          >
+            Cargando historial...
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 4. MODALES (AL FINAL) -->
+
+    <!-- Modal Configuración Columnas -->
+<div id="modal-config-columnas" class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm">
+    <!-- CAMBIO 1: max-w-2xl para que sea más ancho -->
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl modal-enter">
+        
+        <div class="p-4 border-b bg-gray-100 flex justify-between items-center rounded-t-xl">
+            <h3 class="text-lg font-bold text-gray-700">Configurar Visualización</h3>
+            <button onclick="cerrarConfigColumnas()" class="text-gray-400 hover:text-red-500 font-bold text-xl">&times;</button>
+        </div>
+        
+        <div class="p-6">
+            <p class="text-sm text-gray-500 mb-4 border-b pb-2">
+                Marca las casillas de los datos que deseas mostrar:
+            </p>
+            
+            <!-- CAMBIO 2: Grid de 2 columnas -->
+            <div id="lista-columnas" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- JS inyectará checkboxes aquí en formato grilla -->
+            </div>
+        </div>
+        
+        <div class="p-4 border-t bg-gray-50 rounded-b-xl flex justify-end">
+            <button onclick="guardarConfigColumnas()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow transition transform hover:scale-105">
+                Aplicar Cambios
+            </button>
+        </div>
+    </div>
+</div>
+
+    <!-- Modal Importar Recursos -->
+    <div
+      id="modal-importar-recursos"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
+        <div class="p-6 border-b bg-cyan-50 flex justify-between items-center">
+          <h3 class="text-xl font-bold text-cyan-900">
+            Carga Masiva de Recursos
+          </h3>
+          <button
+            onclick="cerrarModalImportarRecursos()"
+            class="text-gray-400 hover:text-red-500 text-2xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form onsubmit="subirExcelRecursos(event)" class="p-8">
+          <div class="mb-6 text-center">
+            <div
+              class="mx-auto w-16 h-16 bg-cyan-100 rounded-full flex items-center justify-center mb-4"
+            >
+              <span class="text-3xl">📦</span>
+            </div>
+            <p class="text-gray-600 text-sm">
+              Sube tu Excel (.xlsx). Columnas sugeridas:
+              <b>Nombre Actividad, Recursos Actividad, Monto, UUID Accion</b>.
+            </p>
+            <p class="text-xs text-orange-500 mt-2 font-bold">
+              Nota: Si no incluyes UUID Acción, quedarán "Sin Asignar".
+            </p>
+          </div>
+          <div class="mb-6">
+            <label class="block text-sm font-bold text-gray-700 mb-2"
+              >Seleccionar Archivo</label
+            >
+            <input
+              type="file"
+              id="archivo-excel-recursos"
+              accept=".xlsx, .xls"
+              required
+              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer border rounded-lg p-2"
+            />
+          </div>
+          <button
+            type="submit"
+            id="btn-subir-rec-excel"
+            class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg shadow transition flex justify-center items-center gap-2"
+          >
+            <span>⬆️</span> Subir Recursos
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Colegio -->
+    <div
+      id="modal-colegio"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl modal-enter">
+        <div class="p-6 border-b bg-blue-50 flex justify-between items-center">
+          <h3 class="text-xl font-bold text-blue-900">
+            Registrar Nuevo Establecimiento
+          </h3>
+          <button
+            onclick="cerrarModalColegio()"
+            class="text-gray-400 hover:text-red-500 text-2xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          onsubmit="guardarColegio(event)"
+          class="p-8 grid grid-cols-2 gap-6"
+        >
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Nombre del Colegio *</label
+            ><input
+              type="text"
+              id="col-nombre"
+              required
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Ej: Colegio Diego Portales"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >RBD *</label
+            ><input
+              type="text"
+              id="col-rbd"
+              required
+              class="w-full border p-3 rounded outline-none"
+              placeholder="Ej: 12345"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >RUT Sostenedor *</label
+            ><input
+              type="text"
+              id="col-rut"
+              required
+              class="w-full border p-3 rounded outline-none"
+              placeholder="Ej: 76.123.456-K"
+            />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Dirección</label
+            ><input
+              type="text"
+              id="col-direccion"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Teléfono</label
+            ><input
+              type="text"
+              id="col-telefono"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Director</label
+            ><input
+              type="text"
+              id="col-director"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div class="col-span-2">
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">URL Logo / Imagen Institucional</label>
+        <input type="text" id="col-imagen" class="w-full border p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://mi-colegio.com/logo.png">
+        <p class="text-xs text-gray-400 mt-1">Pega aquí el enlace directo a la imagen del colegio.</p>
+    </div>
+          <div class="col-span-2 pt-4 flex justify-end gap-3 border-t mt-2">
+            <button
+              type="button"
+              onclick="cerrarModalColegio()"
+              class="px-6 py-2 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 font-bold transition"
+            >
+              Cancelar</button
+            ><button
+              type="submit"
+              class="px-6 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold shadow transition"
+            >
+              Registrar Colegio
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Acción -->
+    <div
+      id="modal-accion"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto modal-enter"
+      >
+        <div
+          class="p-6 border-b bg-gray-50 flex justify-between items-center sticky top-0 z-10"
+        >
+          <h3 class="text-xl font-bold text-gray-800" id="modal-accion-titulo">
+            Ficha de Acción PME
+          </h3>
+          <button
+            onclick="cerrarModalAccion()"
+            class="text-gray-400 hover:text-red-500 text-2xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          id="form-accion"
+          onsubmit="guardarAccion(event)"
+          class="p-8 grid grid-cols-1 md:grid-cols-2 gap-6"
+        >
+          <input type="hidden" id="in-uuid" />
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Nombre de la Acción *</label
+            ><input
+              type="text"
+              id="in-nombre"
+              required
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Dimensión *</label
+            ><select
+              id="in-dimension"
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+            >
+              <option value="Gestión Pedagógica">Gestión Pedagógica</option>
+              <option value="Liderazgo">Liderazgo</option>
+              <option value="Convivencia Escolar">Convivencia Escolar</option>
+              <option value="Gestión de Recursos">Gestión de Recursos</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Subdimensiones</label
+            ><input
+              type="text"
+              id="in-subdimensiones"
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Separa con comas"
+            />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Descripción *</label
+            ><textarea
+              id="in-descripcion"
+              rows="3"
+              required
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Objetivo Estratégico</label
+            ><input
+              type="text"
+              id="in-objetivo"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Estrategia</label
+            ><input
+              type="text"
+              id="in-estrategia"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Planes Asociados</label
+            ><input
+              type="text"
+              id="in-planes"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Responsable General</label
+            ><input
+              type="text"
+              id="in-responsable"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Medios de Verificación</label
+            ><input
+              type="text"
+              id="in-medios"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Recursos Necesarios</label
+            ><input
+              type="text"
+              id="in-recursos-nec"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div
+            class="bg-green-50 p-4 rounded border border-green-200 col-span-2 md:col-span-1"
+          >
+            <label class="block text-xs font-bold text-green-700 uppercase mb-1"
+              >Monto SEP</label
+            ><input
+              type="number"
+              id="in-monto-sep"
+              class="w-full border p-2 rounded outline-none font-mono"
+              placeholder="0"
+            />
+          </div>
+          <div
+            class="bg-blue-50 p-4 rounded border border-blue-200 col-span-2 md:col-span-1"
+          >
+            <label class="block text-xs font-bold text-blue-700 uppercase mb-1"
+              >Monto Total</label
+            ><input
+              type="number"
+              id="in-monto-total"
+              class="w-full border p-2 rounded outline-none font-mono font-bold"
+              placeholder="0"
+            />
+          </div>
+          <div class="col-span-2 pt-4 flex justify-end gap-3 border-t mt-4">
+            <button
+              type="button"
+              onclick="cerrarModalAccion()"
+              class="px-6 py-2 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 font-bold transition"
+            >
+              Cancelar</button
+            ><button
+              type="submit"
+              class="px-6 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold shadow transition"
+            >
+              Guardar Acción
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Recurso (Actividad) -->
+    <div
+      id="modal-recurso"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl modal-enter">
+        <div class="p-6 border-b bg-gray-50 flex justify-between items-center">
+          <h3 class="text-xl font-bold text-gray-800">
+            Agregar Actividad / Recurso
+          </h3>
+          <button
+            onclick="cerrarModalRecurso()"
+            class="text-gray-400 hover:text-red-500 text-2xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          id="form-recurso"
+          onsubmit="guardarRecurso(event)"
+          class="p-8 grid grid-cols-2 gap-6"
+        >
+          <input type="hidden" id="rec-id" />
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Nombre Actividad *</label
+            ><input
+              type="text"
+              id="rec-nombre"
+              required
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-purple-500 outline-none"
+            />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Descripción</label
+            ><textarea
+              id="rec-descripcion"
+              rows="2"
+              class="w-full border p-3 rounded outline-none"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Responsable</label
+            ><input
+              type="text"
+              id="rec-responsable"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Medios Verificación</label
+            ><input
+              type="text"
+              id="rec-medios"
+              class="w-full border p-3 rounded outline-none"
+            />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Lista de Recursos (Separar con comas)</label
+            ><input
+              type="text"
+              id="rec-lista"
+              class="w-full border p-3 rounded bg-yellow-50 outline-none"
+              placeholder="Ej: Lápiz, Papel"
+            />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Costo Estimado</label
+            ><input
+              type="number"
+              id="rec-monto"
+              value="0"
+              class="w-full border p-3 rounded font-mono font-bold text-lg"
+            />
+          </div>
+          <div class="col-span-2 pt-4 flex justify-end gap-3 border-t">
+            <button
+              type="button"
+              onclick="cerrarModalRecurso()"
+              class="px-6 py-2 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 font-bold transition"
+            >
+              Cancelar</button
+            ><button
+              type="submit"
+              class="px-6 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-bold shadow transition"
+            >
+              Guardar Actividad
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Asociar -->
+    <div
+      id="modal-asociar"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
+        <div
+          class="p-6 border-b bg-orange-50 flex justify-between items-center"
+        >
+          <h3 class="text-lg font-bold text-orange-800">Asociar Actividad</h3>
+          <button
+            onclick="cerrarModalAsociar()"
+            class="text-gray-400 hover:text-red-500 font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form onsubmit="guardarAsociacion(event)" class="p-6">
+          <input type="hidden" id="asoc-id-recurso" />
+          <p class="text-sm text-gray-600 mb-4">
+            Estás moviendo la actividad: <br /><strong
+              id="asoc-nombre-recurso"
+              class="text-black text-lg"
+              >...</strong
+            >
+          </p>
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+            >Selecciona la Acción Destino</label
+          >
+          <select
+            id="asoc-select-accion"
+            class="w-full border p-3 rounded focus:ring-2 focus:ring-orange-500 outline-none bg-white mb-6"
+          ></select>
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              onclick="cerrarModalAsociar()"
+              class="px-4 py-2 rounded border hover:bg-gray-100 font-bold"
+            >
+              Cancelar</button
+            ><button
+              type="submit"
+              class="px-4 py-2 rounded bg-orange-600 hover:bg-orange-700 text-white font-bold shadow"
+            >
+              🔗 Asociar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal PME -->
+    <div
+      id="modal-pme"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg modal-enter">
+        <div
+          class="p-6 border-b bg-indigo-50 flex justify-between items-center"
+        >
+          <h3 class="text-xl font-bold text-indigo-900">
+            Configurar Nuevo PME
+          </h3>
+          <button
+            onclick="cerrarModalPME()"
+            class="text-gray-400 hover:text-red-500 text-2xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form id="form-pme" class="p-6 space-y-4">
+          <!-- DATOS DE CONTEXTO (Solo Lectura) -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                class="block text-xs font-bold text-gray-500 uppercase mb-1"
+                >Colegio</label
+              >
+              <input
+                type="text"
+                id="pme-nombre-colegio"
+                readonly
+                class="w-full bg-gray-100 border p-2 rounded text-gray-600 cursor-not-allowed"
+              />
+              <input type="hidden" id="pme-id-colegio" />
+            </div>
+            <div>
+              <label
+                class="block text-xs font-bold text-gray-500 uppercase mb-1"
+                >Año Nuevo</label
+              >
+              <input
+                type="text"
+                id="pme-year"
+                readonly
+                class="w-full bg-gray-100 border p-2 rounded text-gray-600 cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <!-- CAMPOS DE ENTRADA -->
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Director *</label
+            >
+            <input
+              type="text"
+              id="pme-director"
+              required
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="Nombre del Director"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
+              >Observación *</label
+            >
+            <textarea
+              id="pme-observacion"
+              required
+              rows="2"
+              class="w-full border p-3 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+              placeholder="Observación inicial..."
+            ></textarea>
+          </div>
+
+          <hr class="border-gray-200" />
+
+          <!-- AVISO DE CLONACIÓN (Oculto por defecto) -->
+          <div
+            id="pme-msg-copia"
+            class="hidden bg-blue-50 text-blue-800 p-3 rounded text-sm mb-2 border border-blue-200 flex items-center gap-2"
+          >
+            <span class="text-xl">✨</span>
+            <div>
+              <p class="font-bold">Historial encontrado</p>
+              <p class="text-xs">
+                Existe un PME del año
+                <span id="pme-year-ant-text" class="font-bold"></span>. ¿Deseas
+                copiar sus datos?
+              </p>
+            </div>
+          </div>
+
+          <!-- BOTONES DE ACCIÓN -->
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onclick="cerrarModalPME()"
+              class="px-4 py-2 rounded border hover:bg-gray-100 font-bold text-gray-600"
+            >
+              Cancelar
+            </button>
+
+            <!-- GRUPO A: Solo crear (Se muestra si NO hay año anterior) -->
+            <div id="btns-pme-normal">
+              <button
+                type="button"
+                onclick="procesarPME(false)"
+                class="px-6 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow"
+              >
+                Crear PME
+              </button>
+            </div>
+
+            <!-- GRUPO B: Opciones de Copia (Se muestra si SÍ hay año anterior) -->
+            <div id="btns-pme-opciones" class="hidden flex gap-2">
+              <!-- Opción 1: Crear sin copiar -->
+              <button
+                type="button"
+                onclick="procesarPME(false)"
+                class="px-4 py-2 rounded bg-white border border-indigo-600 text-indigo-700 hover:bg-indigo-50 font-bold transition"
+              >
+                Crear Vacío
+              </button>
+              <!-- Opción 2: Copiar -->
+              <button
+                type="button"
+                onclick="procesarPME(true)"
+                class="px-4 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow flex items-center gap-2 transition transform hover:scale-105"
+              >
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  ></path>
+                </svg>
+                Copiar del <span id="btn-year-copy"></span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Insumo -->
+    <div
+      id="modal-insumo"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm modal-enter">
+        <div class="p-4 border-b bg-cyan-50 flex justify-between items-center">
+          <h3 class="text-lg font-bold text-cyan-800">
+            Agregar Recurso / Insumo
+          </h3>
+          <button
+            onclick="cerrarModalInsumo()"
+            class="text-gray-400 hover:text-red-500 font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form onsubmit="guardarNuevoInsumo(event)" class="p-6">
+          <input type="hidden" id="ins-id-actividad" />
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-2"
+            >Nombre del Recurso</label
+          >
+          <input
+            type="text"
+            id="ins-nombre"
+            required
+            class="w-full border p-3 rounded focus:ring-2 focus:ring-cyan-500 outline-none"
+            placeholder="Ej: Resma de papel, Colación..."
+          />
+          <div class="mt-4 flex justify-end">
+            <button
+              type="submit"
+              class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg font-bold shadow"
+            >
+              + Agregar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Importar Excel -->
+    <div
+      id="modal-importar"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
+        <div
+          class="p-6 border-b bg-emerald-50 flex justify-between items-center"
+        >
+          <h3 class="text-xl font-bold text-emerald-900">
+            Carga Masiva de Acciones
+          </h3>
+          <button
+            onclick="cerrarModalImportar()"
+            class="text-gray-400 hover:text-red-500 text-2xl font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <form onsubmit="subirExcelAcciones(event)" class="p-8">
+          <div class="mb-6 text-center">
+            <div
+              class="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4"
+            >
+              <span class="text-3xl">📊</span>
+            </div>
+            <p class="text-gray-600 text-sm">
+              Sube tu archivo Excel (.xlsx) con las columnas: <br /><b
+                >Nombre Acción, Dimension, Monto Total</b
+              >, etc.
+            </p>
+          </div>
+          <div class="mb-6">
+            <label class="block text-sm font-bold text-gray-700 mb-2"
+              >Seleccionar Archivo</label
+            ><input
+              type="file"
+              id="archivo-excel"
+              accept=".xlsx, .xls"
+              required
+              class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border rounded-lg p-2"
+            />
+          </div>
+          <button
+            type="submit"
+            id="btn-subir-excel"
+            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow transition flex justify-center items-center gap-2"
+          >
+            <span>⬆️</span> Subir y Procesar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL PREVISUALIZACIÓN CERTIFICADO (CORREGIDO SCROLL) -->
+<div id="modal-certificado" class="fixed inset-0 bg-gray-900 bg-opacity-90 hidden z-[100] overflow-y-auto items-start justify-center pt-10 pb-10">
+    
+    <!-- Contenedor del contenido (Sin márgenes extraños, solo el ancho) -->
+    <div class="relative w-full max-w-4xl flex flex-col items-center">
+        
+        <!-- BARRA SUPERIOR FLOTANTE -->
+        <div class="w-full flex justify-between items-center mb-4 px-4">
+            <h2 class="text-white text-xl font-bold">Vista Previa del Documento</h2>
+            <button onclick="cerrarModalCertificado()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+        </div>
+
+        <!-- EL PAPEL (Tamaño Carta) -->
+        <div id="certificado-content" class="bg-white w-[216mm] min-h-[279mm] p-12 shadow-2xl text-gray-800 font-serif relative mx-auto flex flex-col">
+            
+            <!-- ENCABEZADO -->
+            <div class="border-b-2 border-blue-900 pb-6 mb-8 text-center">
+                <div class="flex justify-center items-center gap-4 mb-3">
+                    <img id="pdf-header-logo" 
+         src="" 
+         class="w-24 h-24 object-contain" 
+         alt="Logo Colegio"
+         onerror="this.style.display='none'">
+                    <div class="text-left">
+                        <h2 class="font-bold text-lg text-gray-900 uppercase tracking-wide" id="pdf-header-colegio">NOMBRE COLEGIO</h2>
+                        <div class="text-xs text-gray-600 font-sans space-y-0.5">
+                            <p>RBD: <span id="pdf-header-rbd">...</span> | RUT: <span id="pdf-header-rut">...</span></p>
+                            <p id="pdf-header-direccion">Dirección...</p>
+                            <p id="pdf-header-telefono">Teléfono...</p>
+                        </div>
+                    </div>
+                </div>
+                <h1 class="text-2xl font-bold text-blue-900 uppercase mt-4">Certificado de Acción SEP</h1>
+                <p class="text-sm text-gray-500 font-bold" id="pdf-header-year">AÑO 202X</p>
+            </div>
+
+            <!-- CUERPO -->
+            <div class="flex-1 px-4">
+    <p class="mb-6 text-sm text-justify">
+        El Director del establecimiento certifica que la siguiente acción y sus actividades se encuentran debidamente registradas:
+    </p>
+
+    <table class="w-full text-xs md:text-sm font-serif leading-normal">
+        
+        <!-- 1. DIMENSIÓN -->
+        <tr id="pdf-row-dimension" class="border-b border-gray-100">
+            <td class="align-top font-bold text-gray-700 py-2 w-40">Dimensión</td>
+            <td class="align-top py-2 w-4">:</td>
+            <td class="align-top py-2 capitalize" id="pdf-dimension">...</td>
+        </tr>
+
+        <!-- 2. SUBDIMENSIÓN -->
+        <tr id="pdf-row-subdimension" class="border-b border-gray-100">
+            <td class="align-top font-bold text-gray-700 py-2">Subdimensión</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 capitalize" id="pdf-subdimension">...</td>
+        </tr>
+
+        <!-- Espaciador -->
+        <tr><td colspan="3" class="py-2"></td></tr>
+
+        <!-- 3. NOMBRE ACCIÓN -->
+        <tr id="pdf-row-accion-nombre" class="bg-gray-50">
+            <td class="align-top font-bold text-gray-800 py-2 pl-2">Nombre Acción</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 font-semibold text-blue-900 uppercase pr-2" id="pdf-nombre-accion">...</td>
+        </tr>
+
+        <!-- 4. DESCRIPCIÓN ACCIÓN -->
+        <tr id="pdf-row-accion-desc">
+            <td class="align-top font-bold text-gray-700 py-2 pl-2">Desc. Acción</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 text-justify text-gray-600 italic pr-2" id="pdf-desc-accion">...</td>
+        </tr>
+
+        <!-- Espaciador -->
+        <tr><td colspan="3" class="py-2"></td></tr>
+
+        <!-- 5. NOMBRE ACTIVIDAD -->
+        <tr id="pdf-row-actividad-nombre" class="bg-gray-50">
+            <td class="align-top font-bold text-gray-800 py-2 pl-2">Actividad</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 font-bold uppercase pr-2" id="pdf-nombre-actividad">...</td>
+        </tr>
+
+        <!-- 6. DESCRIPCIÓN ACTIVIDAD -->
+        <tr id="pdf-row-actividad-desc">
+            <td class="align-top font-bold text-gray-700 py-2 pl-2">Desc. Actividad</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 text-justify pr-2" id="pdf-desc-actividad">...</td>
+        </tr>
+        
+        <!-- EXTRAS (Recursos y Monto) -->
+        <tr id="pdf-row-recursos">
+            <td class="align-top font-bold text-gray-700 py-2 pl-2">Insumos</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 text-xs" id="pdf-lista-recursos">...</td>
+        </tr>
+
+        <tr id="pdf-row-monto">
+            <td class="align-top font-bold text-gray-700 py-2 pl-2">Monto</td>
+            <td class="align-top py-2">:</td>
+            <td class="align-top py-2 font-mono font-bold text-black" id="pdf-monto">...</td>
+        </tr>
+    </table>
+</div>
+            <!-- PIE DE PÁGINA -->
+            <div class="absolute bottom-12 left-0 w-full px-16 font-serif text-gray-800">
+                <div id="pdf-footer-bloque" class="flex justify-between items-end mb-2">
+                    <div class="text-xl text-gray-700 mb-4 tracking-wide" id="pdf-ciudad">Alto Hospicio</div>
+                    <div class="flex items-center gap-4">
+                        <img id="pdf-footer-logo" 
+         src="" 
+         class="w-20 h-20 object-contain" 
+         alt="Insignia"
+         onerror="this.src='https://cdn-icons-png.flaticon.com/512/201/201614.png'"><div class="text-left leading-tight">
+                            <p class="font-bold text-gray-900 text-lg" id="pdf-firma-director">Director(a)</p>
+                            <p class="text-blue-900 text-sm font-bold my-0.5">Director</p>
+                            <p class="text-xs text-gray-500 italic" id="pdf-firma-colegio">Establecimiento</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-t-2 border-gray-300 mb-1"></div>
+                <div class="border-t border-gray-200 mb-4"></div>
+                <div class="text-center text-sm text-gray-800"><p class="font-bold italic mb-1" id="pdf-footer-nombre">Establecimiento...</p><p class="text-xs font-sans text-gray-600" id="pdf-footer-direccion">Dirección...</p></div>
+                <div class="text-center mt-2"><p class="text-[8px] text-gray-300 font-sans">UUID: <span id="pdf-uuid"></span></p></div>
+            </div>
+        </div>
+
+        <!-- BOTONES -->
+        <div class="flex gap-4 mt-6">
+            <button onclick="cerrarModalCertificado()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">Cancelar</button>
+            <button onclick="descargarCertificadoPDF()" id="btn-download-pdf" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg flex items-center gap-2 transition transform hover:scale-105">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Descargar PDF
+            </button>
+        </div>
+
+    </div>
+</div>
+
+    <!-- Modal Exportar Recursos -->
+    <div
+      id="modal-exportar-recursos"
+      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
+    >
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
+        <div
+          class="p-4 border-b bg-indigo-50 flex justify-between items-center"
+        >
+          <h3 class="text-lg font-bold text-indigo-900">
+            Configurar Reporte Excel
+          </h3>
+          <button
+            onclick="cerrarModalExportarRecursos()"
+            class="text-gray-400 hover:text-red-500 font-bold"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="p-6">
+          <p class="text-sm text-gray-600 mb-4">Selecciona las columnas:</p>
+          <form
+            id="form-export-cols"
+            class="grid grid-cols-2 gap-3 text-sm text-gray-700"
+          >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="nombre_actividad"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Actividad</label
+            >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="descripcion_actividad"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Desc. Actividad</label
+            >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="recursos_actividad"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Insumos</label
+            >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="responsable"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Responsable</label
+            >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="monto"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Monto</label
+            >
+            <div class="col-span-2 border-t my-2"></div>
+            <label class="flex items-center gap-2 font-semibold text-indigo-700"
+              ><input
+                type="checkbox"
+                value="nombre_accion"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Nombre Acción</label
+            >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="descripcion_accion"
+                checked
+                class="w-4 h-4 text-indigo-600"
+              />
+              Desc. Acción</label
+            >
+            <label class="flex items-center gap-2"
+              ><input
+                type="checkbox"
+                value="dimension"
+                class="w-4 h-4 text-indigo-600"
+              />
+              Dimensión</label
+            >
+          </form>
+        </div>
+        <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+          <button
+            onclick="cerrarModalExportarRecursos()"
+            class="px-4 py-2 rounded border hover:bg-gray-100 font-bold"
+          >
+            Cancelar</button
+          ><button
+            onclick="descargarExcelRecursos()"
+            id="btn-descargar-rec"
+            class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold shadow"
+          >
+            Descargar Excel
+          </button>
+        </div>
+      </div>
+    </div>
+    </div>
+    <div id="modal-exportar-accion" class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
+        <div class="p-4 border-b bg-indigo-50 flex justify-between items-center">
+            <h3 class="text-lg font-bold text-indigo-900">Reporte de Acción</h3>
+            <button onclick="toggleModal('modal-exportar-accion', false)" class="text-gray-400 hover:text-red-500 font-bold">&times;</button>
+        </div>
+        
+        <div class="p-6">
+            <p class="text-sm text-gray-600 mb-4">Elige los datos a incluir en el Excel:</p>
+            
+            <form id="form-export-accion-cols" class="grid grid-cols-2 gap-3 text-sm text-gray-700">
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="nombre_actividad" checked class="w-4 h-4 text-indigo-600 rounded"> Actividad</label>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="recursos_actividad" checked class="w-4 h-4 text-indigo-600 rounded"> Insumos</label>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="responsable" checked class="w-4 h-4 text-indigo-600 rounded"> Responsable</label>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="monto" checked class="w-4 h-4 text-indigo-600 rounded"> Monto</label>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="descripcion_actividad" class="w-4 h-4 text-indigo-600 rounded"> Desc. Actividad</label>
+                
+                <div class="col-span-2 border-t my-2"></div>
+                
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-indigo-700 font-bold"><input type="checkbox" value="nombre_accion" checked class="w-4 h-4 text-indigo-600 rounded"> Nombre Acción</label>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="descripcion_accion" checked class="w-4 h-4 text-indigo-600 rounded"> Desc. Acción</label>
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"><input type="checkbox" value="uuid_accion" class="w-4 h-4 text-indigo-600 rounded"> UUID</label>
+            </form>
+        </div>
+
+        <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+            <button onclick="toggleModal('modal-exportar-accion', false)" class="px-4 py-2 rounded border hover:bg-gray-100 font-bold">Cancelar</button>
+            <button onclick="descargarExcelAccionDetalle()" id="btn-exp-acc-det" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold shadow">Descargar</button>
+        </div>
+    </div>
+</div>
+    <script src="script.js"></script>
+  </body>
+</html>
