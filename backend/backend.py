@@ -24,6 +24,8 @@ DB_NAME = os.getenv("DB_NAME", "pme_colegios")
 
 print(f"🔌 Conectando a: {MONGO_URI}")
 
+
+
 try:
     # Agregamos tlsCAFile para evitar errores SSL en contenedores
     client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
@@ -42,9 +44,16 @@ col_users = db["users"]
 
 app = FastAPI(title="API Orquestador PME")
 
+# 1. Leer la variable de entorno
+# Si no existe, por defecto permitimos localhost para evitar bloqueos en desarrollo
+origins_raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:8090")
+
+# 2. Convertir el string "url1,url2" en una lista ["url1", "url2"]
+origins = [origin.strip() for origin in origins_raw.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # <--- ESTO PERMITE TODO (Para desarrollo)
+    allow_origins=origins, # <--- ESTO PERMITE TODO (Para desarrollo)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

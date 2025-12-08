@@ -12,6 +12,7 @@ services:
     environment:
       - MONGO_URI=${MONGO_URI}
       - DB_NAME=${DB_NAME}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
     # VOLUMEN: Conecta tu carpeta local './backend' con '/app' dentro del contenedor
     volumes:
       - ./backend:/app
