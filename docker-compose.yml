@@ -8,12 +8,16 @@ services:
     container_name: pme_new_backend
     restart: always
     ports:
-      # Usamos variable para el puerto externo
       - "${PORT_BACKEND}:8000"
     environment:
-      # Pasamos las variables del .env al contenedor
       - MONGO_URI=${MONGO_URI}
       - DB_NAME=${DB_NAME}
+    # VOLUMEN: Conecta tu carpeta local './backend' con '/app' dentro del contenedor
+    volumes:
+      - ./backend:/app
+    # COMANDO: Sobrescribimos el comando para agregar '--reload'. 
+    # Esto hace que Python detecte cambios en el código y reinicie el servidor automáticamente.
+    command: uvicorn backend:app --host 0.0.0.0 --port 8000 --reload
 
   # --- FRONTEND HTML ---
   pme_new_frontend:
@@ -22,10 +26,12 @@ services:
     container_name: pme_new_frontend
     restart: always
     ports:
-      # Usamos variable para el puerto externo
       - "${PORT_FRONTEND}:80"
     depends_on:
       - pme_new_backend
+    # VOLUMEN: Conecta tu carpeta local './frontend' con la carpeta web de Nginx
+    volumes:
+      - ./frontend:/usr/share/nginx/html
 
 networks:
   default:
