@@ -1,34 +1,33 @@
 import os
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse 
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, Field, BeforeValidator
+from typing import List, Optional, Annotated
 from datetime import datetime
 from bson import ObjectId
 import uuid
 import pandas as pd
 from io import BytesIO
+from dotenv import load_dotenv
+import certifi
 
 # ==========================================
 # 1. CONFIGURACIÓN Y BASE DE DATOS
 # ==========================================
 
-# Cargar variables desde archivo .env (solo para desarrollo local)
 load_dotenv()
 
-# Obtener variables de entorno (Con valores por defecto si fallan)
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME = os.getenv("DB_NAME", "pme_colegios")
 
-print(f"🔌 Conectando a MongoDB en: {MONGO_URI} (DB: {DB_NAME})")
+print(f"🔌 Conectando a: {MONGO_URI}")
 
 try:
-    client = MongoClient(MONGO_URI)
+    # Agregamos tlsCAFile para evitar errores SSL en contenedores
+    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
     db = client[DB_NAME]
-    # Verificar conexión
     client.admin.command('ping')
     print("✅ Conexión exitosa a MongoDB")
 except Exception as e:
@@ -51,25 +50,13 @@ app.add_middleware(
 )
 
 # ==========================================
-# 2. UTILIDADES Y ESQUEMAS
+# 2. UTILIDADES Y ESQUEMAS (ADAPTADO PYDANTIC V2)
 # ==========================================
 
-class PyObjectId(str):
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+# Lógica para convertir ObjectId a String automáticamente en los modelos
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
-    @classmethod
-    def validate(cls, v):
-        if not ObjectId.is_valid(str(v)):
-            raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
-
-    @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
-
-# Esquemas
+# --- Esquemas Generales ---
 class SchemaUser(BaseModel):
     perfil: str 
     contrasena: str
@@ -81,6 +68,7 @@ class SchemaClonacion(BaseModel):
     id_pme_origen: str
     id_pme_destino: str
 
+# --- Esquemas Colegio ---
 class SchemaColegio(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     nombre: str
@@ -89,28 +77,23 @@ class SchemaColegio(BaseModel):
     direccion: Optional[str] = None
     telefono: Optional[str] = None
     director: Optional[str] = None
-    # CAMBIO AQUÍ: Ahora es string (URL)
-    imagen: Optional[str] = None 
-    
-    
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    imagen: Optional[str] = None
 
+    class Config:
+        populate_by_name = True # Reemplaza a allow_population_by_field_name en v2
+        arbitrary_types_allowed = True
+
+# --- Esquemas PME ---
 class Schema_PME(BaseModel):
-    id: Optional[str] = Field(alias="_id", default=None)
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
     year: int
     id_colegio: str
     director: str
     observacion: str
+    
     class Config:
-        allow_population_by_field_name = True
-        json_encoders = {ObjectId: str}
-
-class Schema_PME_Update(BaseModel):
-    director: str
-    observacion: str
+        populate_by_name = True
+        arbitrary_types_allowed = True
 
 class Schema_PME_Create(BaseModel):
     year: int
@@ -119,6 +102,7 @@ class Schema_PME_Create(BaseModel):
     observacion: str
     clonar: bool = False
 
+# --- Esquemas Acciones ---
 class Schema_Acciones(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     uuid_accion: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -128,19 +112,23 @@ class Schema_Acciones(BaseModel):
     descripcion: str
     dimension: str
     subdimensiones: List[str] = []
+    
     objetivo_estrategico: Optional[str] = None
     estrategia: Optional[str] = None
     planes: Optional[str] = None
     responsable: Optional[str] = None
     recursos_necesarios_ejecucion: Optional[str] = None
     medios_verificacion: Optional[str] = None
+    
     monto_sep: int = 0
     monto_total: int = 0
     fecha_actualizacion: datetime = Field(default_factory=datetime.now)
-    class Config:
-        allow_population_by_field_name = True
-        json_encoders = {ObjectId: str}
 
+    class Config:
+        populate_by_name = True
+        arbitrary_types_allowed = True
+
+# --- Esquemas Recursos ---
 class Schema_Recursos(BaseModel):
     id: Optional[PyObjectId] = Field(alias='_id', default=None)
     id_pme: str
@@ -155,12 +143,13 @@ class Schema_Recursos(BaseModel):
     monto: int = 0
     year: int
     fecha: datetime = Field(default_factory=datetime.now)
+
     class Config:
-        allow_population_by_field_name = True
-        json_encoders = {ObjectId: str}
+        populate_by_name = True
+        arbitrary_types_allowed = True
 
 # ==========================================
-# 3. ENDPOINTS: AUTH
+# 3. ENDPOINTS
 # ==========================================
 
 @app.post("/api/login")
@@ -177,10 +166,7 @@ def login(user: SchemaUser):
         }
     raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
-# ==========================================
-# 4. ENDPOINTS: COLEGIOS
-# ==========================================
-
+# --- Colegios ---
 @app.get("/api/colegios")
 def get_colegios():
     colegios = list(col_colegios.find())
@@ -191,15 +177,14 @@ def get_colegios():
 def create_colegio(col: SchemaColegio):
     if col_colegios.find_one({"nombre": col.nombre}):
         raise HTTPException(status_code=400, detail="Nombre de colegio ya existe")
-    new_col = col.dict(by_alias=True, exclude={"id"})
-    new_col["_id"] = str(ObjectId()) 
+    
+    new_col = col.model_dump(by_alias=True, exclude={"id"}) # model_dump es el nuevo .dict()
+    new_col["_id"] = str(ObjectId())
+    
     col_colegios.insert_one(new_col)
     return {"msg": "Colegio creado", "id": new_col["_id"]}
 
-# ==========================================
-# 5. ENDPOINTS: PME (COMPLETO)
-# ==========================================
-
+# --- PME ---
 @app.get("/api/pme/buscar")
 def get_pme_id(id_colegio: str, year: int):
     pme = col_pme.find_one({"id_colegio": id_colegio, "year": year})
@@ -207,20 +192,25 @@ def get_pme_id(id_colegio: str, year: int):
         return {"id_pme": str(pme["_id"]), "exist": True}
     return {"exist": False, "msg": "No se encontró PME"}
 
+@app.get("/api/pmes/colegio/{id_colegio}")
+def listar_pmes_por_colegio(id_colegio: str):
+    data = list(col_pme.find({"id_colegio": id_colegio}))
+    for p in data: p["_id"] = str(p["_id"])
+    data.sort(key=lambda x: x["year"], reverse=True)
+    return data
+
 @app.post("/api/pme")
 def create_pme(pme: Schema_PME_Create):
-    # Validar existencia
     if col_pme.find_one({"id_colegio": pme.id_colegio, "year": pme.year}):
         raise HTTPException(status_code=400, detail="El PME ya existe")
     
-    # Crear PME
-    new_pme = pme.dict(exclude={"clonar"})
+    # model_dump en v2
+    new_pme = pme.model_dump(exclude={"clonar"})
     new_pme["_id"] = str(ObjectId())
     col_pme.insert_one(new_pme)
     
     acciones_copiadas = 0
     
-    # Clonación
     if pme.clonar:
         year_ant = pme.year - 1
         pme_ant = col_pme.find_one({"id_colegio": pme.id_colegio, "year": year_ant})
@@ -229,7 +219,6 @@ def create_pme(pme: Schema_PME_Create):
             id_old = str(pme_ant["_id"])
             id_new = new_pme["_id"]
             
-            # Copiar Acciones
             acciones = list(col_acciones.find({"id_pme": id_old}))
             for acc in acciones:
                 uuid_old = acc["uuid_accion"]
@@ -241,7 +230,6 @@ def create_pme(pme: Schema_PME_Create):
                 col_acciones.insert_one(acc_new)
                 acciones_copiadas += 1
                 
-                # Copiar Recursos
                 recursos = list(col_recursos.find({"uuid_accion": uuid_old}))
                 for rec in recursos:
                     rec_new = rec.copy()
@@ -251,354 +239,280 @@ def create_pme(pme: Schema_PME_Create):
 
     return {"msg": "Creado", "id_pme": new_pme["_id"], "copiados": acciones_copiadas}
 
-# --- ENDPOINTS FALTANTES PARA GESTIÓN DE PME ---
-
-@app.put("/api/pme/{id_pme}")
-def actualizar_pme(id_pme: str, datos: Schema_PME_Update):
+@app.post("/api/pme/clonar")
+def clonar_pme_anio_anterior(datos: SchemaClonacion):
     try:
-        col_pme.update_one(
-            {"_id": id_pme}, 
-            {"$set": {"director": datos.director, "observacion": datos.observacion}}
-        )
-        return {"msg": "PME Actualizado"}
+        # PME Destino (Buscamos por ID string, si falla intentamos ObjectId)
+        pme_destino = col_pme.find_one({"_id": datos.id_pme_destino})
+        if not pme_destino:
+             pme_destino = col_pme.find_one({"_id": ObjectId(datos.id_pme_destino)})
+        
+        if not pme_destino:
+            raise HTTPException(status_code=404, detail="PME Destino no encontrado")
+        
+        nuevo_year = pme_destino["year"]
+        acciones_origen = list(col_acciones.find({"id_pme": datos.id_pme_origen}))
+        
+        cnt_acc = 0
+        for accion in acciones_origen:
+            uuid_old = accion["uuid_accion"]
+            uuid_new = str(uuid.uuid4())
+
+            nueva = accion.copy()
+            if "_id" in nueva: del nueva["_id"]
+            nueva.update({"id_pme": datos.id_pme_destino, "year": nuevo_year, "uuid_accion": uuid_new})
+            col_acciones.insert_one(nueva)
+            cnt_acc += 1
+
+            recursos = list(col_recursos.find({"uuid_accion": uuid_old}))
+            for r in recursos:
+                r_new = r.copy()
+                if "_id" in r_new: del r_new["_id"]
+                r_new.update({"id_pme": datos.id_pme_destino, "year": nuevo_year, "uuid_accion": uuid_new})
+                col_recursos.insert_one(r_new)
+
+        return {"msg": "Clonación manual exitosa", "acciones": cnt_acc}
     except Exception as e:
+        print(f"Error clonar: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 2. ELIMINAR UN PME (Y TODO SU CONTENIDO EN CASCADA)
 @app.delete("/api/pme/{id_pme}")
 def eliminar_pme_cascada(id_pme: str):
-    try:
-        # Borrar el PME
-        res = col_pme.delete_one({"_id": id_pme}) # Recuerda que guardamos ID como string manual
-        if res.deleted_count == 0:
-             # Si no lo encuentra como string, intenta como ObjectId (por compatibilidad)
-             col_pme.delete_one({"_id": id_pme})
-
-        # Borrar Acciones asociadas (id_pme se guarda como string)
-        col_acciones.delete_many({"id_pme": id_pme})
+    res = col_pme.delete_one({"_id": id_pme}) 
+    if res.deleted_count == 0:
+        try:
+            col_pme.delete_one({"_id": ObjectId(id_pme)})
+        except: pass
         
-        # Borrar Recursos asociados
-        col_recursos.delete_many({"id_pme": id_pme})
-        
-        return {"msg": "PME y todos sus datos eliminados correctamente"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    col_acciones.delete_many({"id_pme": id_pme})
+    col_recursos.delete_many({"id_pme": id_pme})
+    return {"msg": "Eliminado"}
 
-# ==========================================
-# 6. ENDPOINTS: ACCIONES
-# ==========================================
-
+# --- Acciones ---
 @app.get("/api/acciones/{id_pme}")
 def listar_acciones(id_pme: str):
-    acciones = list(col_acciones.find({"id_pme": id_pme}))
-    for acc in acciones: acc["_id"] = str(acc["_id"])
-    return acciones 
+    data = list(col_acciones.find({"id_pme": id_pme}))
+    for d in data: d["_id"] = str(d["_id"])
+    return data
 
 @app.post("/api/acciones")
 def crear_accion(accion: Schema_Acciones):
-    new_acc = accion.dict(by_alias=True, exclude={"id"})
+    new_acc = accion.model_dump(by_alias=True, exclude={"id"})
     col_acciones.insert_one(new_acc)
-    return {"msg": "Acción creada", "uuid": new_acc["uuid_accion"]}
+    return {"msg": "Creada", "uuid": new_acc["uuid_accion"]}
 
 @app.put("/api/acciones/{uuid}")
 def modificar_accion(uuid: str, accion: Schema_Acciones):
-    update_data = accion.dict(exclude_unset=True, exclude={"id", "uuid_accion"})
-    update_data["fecha_actualizacion"] = datetime.now()
-    res = col_acciones.update_one({"uuid_accion": uuid}, {"$set": update_data})
+    upd = accion.model_dump(exclude_unset=True, exclude={"id", "uuid_accion"})
+    upd["fecha_actualizacion"] = datetime.now()
+    
+    res = col_acciones.update_one({"uuid_accion": uuid}, {"$set": upd})
     if res.modified_count == 0:
-        return {"msg": "No se modificó nada"}
+        return {"msg": "No se modificó nada o no existe"}
     return {"msg": "Acción actualizada"}
 
 @app.delete("/api/acciones/{uuid}")
 def eliminar_accion(uuid: str):
     col_acciones.delete_one({"uuid_accion": uuid})
     col_recursos.delete_many({"uuid_accion": uuid})
-    return {"msg": "Acción eliminada"}
+    return {"msg": "Eliminada"}
 
 @app.post("/api/acciones/importar_excel")
 async def importar_acciones_excel(id_pme: str, year: int, file: UploadFile = File(...)):
     try:
-        if not file.filename.endswith(('.xls', '.xlsx')):
-             raise HTTPException(status_code=400, detail="Formato inválido. Use .xlsx")
-
         contents = await file.read()
-        df = pd.read_excel(BytesIO(contents))
+        df = pd.read_excel(BytesIO(contents)).fillna("")
         df.columns = [c.strip().lower().replace(' ', '_').replace('ó','o').replace('é','e').replace('í','i').replace('á','a') for c in df.columns]
-        df = df.fillna("")
-        data = df.to_dict('records')
         
         insert_list = []
-        for row in data:
+        for row in df.to_dict('records'):
             row["uuid_accion"] = str(uuid.uuid4())
             row["id_pme"] = id_pme
             row["year"] = year
+            
             sub = row.get("subdimensiones", "")
             row["subdimensiones"] = [s.strip() for s in sub.split(',')] if sub else []
 
             try:
                 acc = Schema_Acciones(**row)
-                acc_dict = acc.dict(by_alias=True, exclude={"id"})
+                acc_dict = acc.model_dump(by_alias=True, exclude={"id"})
                 acc_dict["_id"] = str(ObjectId())
                 insert_list.append(acc_dict)
-            except Exception: continue
+            except: continue
 
         if insert_list:
             res = col_acciones.insert_many(insert_list)
             return {"msg": "Importación exitosa", "total": len(res.inserted_ids)}
         return {"msg": "No se importaron datos", "total": 0}
+
     except Exception as e:
+        print(f"Error importación: {e}")
         raise HTTPException(status_code=500, detail="Error interno")
 
 @app.get("/api/acciones/exportar/{id_pme}")
 def exportar_acciones_excel(id_pme: str):
-    try:
-        acciones = list(col_acciones.find({"id_pme": id_pme}))
-        if not acciones: raise HTTPException(status_code=404, detail="No hay acciones")
+    accs = list(col_acciones.find({"id_pme": id_pme}))
+    if not accs: raise HTTPException(404, "No hay datos")
+    
+    df = pd.DataFrame(accs)
+    if "_id" in df.columns: del df["_id"]
+    
+    if "subdimensiones" in df.columns:
+        df["subdimensiones"] = df["subdimensiones"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
+        
+    stream = BytesIO()
+    df.to_excel(stream, index=False)
+    stream.seek(0)
+    fname = f"Acciones_PME_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={fname}"})
 
-        df = pd.DataFrame(acciones)
-        if "_id" in df.columns: del df["_id"]
-        if "subdimensiones" in df.columns:
-            df["subdimensiones"] = df["subdimensiones"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
-
-        stream = BytesIO()
-        df.to_excel(stream, index=False, sheet_name="Acciones PME")
-        stream.seek(0)
-        filename = f"Acciones_PME_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-
-        return StreamingResponse(
-            stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==========================================
-# 7. ENDPOINTS: RECURSOS
-# ==========================================
-
+# --- Recursos ---
 @app.get("/api/recursos/{uuid_accion}")
 def listar_recursos(uuid_accion: str):
-    recursos = list(col_recursos.find({"uuid_accion": uuid_accion}))
-    for r in recursos: r["_id"] = str(r["_id"])
-    return recursos
+    data = list(col_recursos.find({"uuid_accion": uuid_accion}))
+    for d in data: d["_id"] = str(d["_id"])
+    return data
 
 @app.get("/api/recursos/pme/{id_pme}")
 def listar_todos_recursos_pme(id_pme: str):
-    recursos = list(col_recursos.find({"id_pme": id_pme}))
-    for r in recursos: r["_id"] = str(r["_id"])
-    return recursos
+    data = list(col_recursos.find({"id_pme": id_pme}))
+    for d in data: d["_id"] = str(d["_id"])
+    return data
 
 @app.post("/api/recursos")
 def crear_recurso(recurso: Schema_Recursos):
-    new_recurso = recurso.dict(by_alias=True, exclude={"id"})
-    res = col_recursos.insert_one(new_recurso)
-    return {"msg": "Recurso creado", "id": str(res.inserted_id)}
+    new = recurso.model_dump(by_alias=True, exclude={"id"})
+    res = col_recursos.insert_one(new)
+    return {"msg": "Creado", "id": str(res.inserted_id), "uuid_accion_padre": new["uuid_accion"]}
 
 @app.put("/api/recursos/{id_recurso}")
 def modificar_recurso(id_recurso: str, recurso: Schema_Recursos):
-    update_data = recurso.dict(exclude_unset=True, exclude={"id"})
+    update_data = recurso.model_dump(exclude_unset=True, exclude={"id"})
     try:
-        col_recursos.update_one({"_id": id_recurso}, {"$set": update_data})
+        col_recursos.update_one({"_id": ObjectId(id_recurso)}, {"$set": update_data})
         return {"msg": "Recurso actualizado"}
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
+    except: raise HTTPException(400, "ID inválido")
 
 @app.delete("/api/recursos/{id_recurso}")
 def eliminar_recurso(id_recurso: str):
     try:
         col_recursos.delete_one({"_id": ObjectId(id_recurso)})
         return {"msg": "Recurso eliminado"}
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
+    except: raise HTTPException(400, "ID inválido")
 
 @app.post("/api/recursos/importar_excel")
 async def importar_recursos_excel(id_pme: str, year: int, file: UploadFile = File(...)):
     try:
-        if not file.filename.endswith(('.xls', '.xlsx')): raise HTTPException(status_code=400, detail="Use .xlsx")
         contents = await file.read()
-        df = pd.read_excel(BytesIO(contents))
-        df.columns = [c.strip().lower().replace(' ', '_').replace('ó','o').replace('descripción', 'descripcion') for c in df.columns]
-        df = df.fillna("")
-        data = df.to_dict('records')
+        df = pd.read_excel(BytesIO(contents)).fillna("")
+        df.columns = [c.strip().lower().replace(' ', '_').replace('ó','o').replace('descripción','descripcion') for c in df.columns]
         
         insert_list = []
-        for row in data:
-            row["id_pme"] = id_pme
-            row["year"] = year
+        for row in df.to_dict('records'):
+            row.update({"id_pme": id_pme, "year": year})
             uuid_traido = str(row.get("uuid_accion", "")).strip()
             row["uuid_accion"] = uuid_traido if uuid_traido and uuid_traido.lower() != "nan" else "sin asignar"
-            rec_str = row.get("recursos_actividad", row.get("insumos", ""))
-            row["recursos_actividad"] = [s.strip() for s in rec_str.split(',')] if rec_str else []
-
+            
+            rs = row.get("recursos_actividad", row.get("insumos", ""))
+            row["recursos_actividad"] = [s.strip() for s in rs.split(',')] if rs else []
+            
             try:
                 res_obj = Schema_Recursos(**row)
-                res_dict = res_obj.dict(by_alias=True, exclude={"id"})
+                res_dict = res_obj.model_dump(by_alias=True, exclude={"id"})
                 res_dict["_id"] = str(ObjectId())
                 insert_list.append(res_dict)
-            except Exception: continue
+            except: continue
 
         if insert_list:
             res = col_recursos.insert_many(insert_list)
-            return {"msg": "Importación exitosa", "total": len(res.inserted_ids), "huérfanos": sum(1 for x in insert_list if x["uuid_accion"] == "sin asignar")}
-        return {"msg": "No se importaron datos", "total_registrados": 0}
+            return {"msg": "Importado", "total_registrados": len(res.inserted_ids), "huérfanos": sum(1 for x in insert_list if x["uuid_accion"] == "sin asignar")}
+        return {"msg": "Sin datos", "total_registrados": 0}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error importacion recursos: {e}")
+        raise HTTPException(500, str(e))
 
 @app.post("/api/recursos/exportar_custom/{id_pme}")
 def exportar_recursos_custom(id_pme: str, payload: ExportColumnas):
-    try:
-        recursos = list(col_recursos.find({"id_pme": id_pme}))
-        if not recursos: raise HTTPException(status_code=404, detail="No hay recursos")
-
-        acciones = list(col_acciones.find({"id_pme": id_pme}))
-        acciones_map = {acc["uuid_accion"]: acc for acc in acciones}
-
-        data_procesada = []
-        for rec in recursos:
-            accion_padre = acciones_map.get(rec.get("uuid_accion"), {})
-            recursos_list = rec.get("recursos_actividad", [])
-            recursos_str = ", ".join(recursos_list) if isinstance(recursos_list, list) else str(recursos_list)
-
-            fila = {
-                "nombre_actividad": rec.get("nombre_actividad", ""),
-                "descripcion_actividad": rec.get("descripcion_actividad", ""),
-                "responsable": rec.get("responsable", ""),
-                "medios_ver": rec.get("medios_ver", ""),
-                "recursos_actividad": recursos_str,
-                "monto": rec.get("monto", 0),
-                "year": rec.get("year", ""),
-                "uuid_accion": rec.get("uuid_accion", ""),
-                "nombre_accion": accion_padre.get("nombre_accion", "Huérfano"),
-                "descripcion_accion": accion_padre.get("descripcion", ""),
-                "dimension": accion_padre.get("dimension", "")
-            }
-            data_procesada.append(fila)
-
-        df = pd.DataFrame(data_procesada)
-        cols_finales = [c for c in payload.columnas if c in df.columns]
-        if not cols_finales: cols_finales = df.columns.tolist()
-        df = df[cols_finales]
-
-        stream = BytesIO()
-        df.to_excel(stream, index=False, sheet_name="Recursos PME")
-        stream.seek(0)
-        filename = f"Reporte_Actividades_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-
-        return StreamingResponse(
-            stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- EXPORTACIÓN ESPECÍFICA POR ACCIÓN ---
-
-# 1. LISTAR TODOS LOS PMES DE UN COLEGIO
-@app.get("/api/pmes/colegio/{id_colegio}")
-def listar_pmes_por_colegio(id_colegio: str):
-    try:
-        # Buscamos todos los PME que coincidan con el ID del colegio
-        lista_pmes = list(col_pme.find({"id_colegio": id_colegio}))
-        
-        # Convertimos ObjectId a string
-        for pme in lista_pmes:
-            pme["_id"] = str(pme["_id"])
-            
-        # Ordenamos por año descendente (del más nuevo al más viejo)
-        lista_pmes.sort(key=lambda x: x["year"], reverse=True)
-        
-        return lista_pmes
-    except Exception as e:
-        print(f"Error listando PMEs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    recursos = list(col_recursos.find({"id_pme": id_pme}))
+    if not recursos: raise HTTPException(404, "No hay recursos")
     
+    acciones = list(col_acciones.find({"id_pme": id_pme}))
+    acciones_map = {a["uuid_accion"]: a for a in acciones}
     
-@app.post("/api/recursos/exportar_custom_accion/{uuid_accion}")
-def exportar_recursos_por_accion(uuid_accion: str, payload: ExportColumnas):
-    try:
-        # 1. Obtener Recursos de ESA acción
-        recursos = list(col_recursos.find({"uuid_accion": uuid_accion}))
-        if not recursos:
-            raise HTTPException(status_code=404, detail="Esta acción no tiene recursos asociados")
-
-        # 2. Obtener Datos de la Acción Padre
-        accion = col_acciones.find_one({"uuid_accion": uuid_accion})
-        if not accion:
-            # Caso raro, pero por si acaso
-            accion = {"nombre_accion": "Desconocida", "descripcion": "Sin descripción", "uuid_accion": uuid_accion}
-
-        # 3. Aplanar datos (Flattening)
-        data_procesada = []
+    data_procesada = []
+    for rec in recursos:
+        padre = acciones_map.get(rec.get("uuid_accion"), {})
+        r_list = rec.get("recursos_actividad", [])
         
-        for rec in recursos:
-            # Formatear lista de insumos
-            recursos_list = rec.get("recursos_actividad", [])
-            recursos_str = ", ".join(recursos_list) if isinstance(recursos_list, list) else str(recursos_list)
-
-            fila = {
-                # Datos Recurso
-                "nombre_actividad": rec.get("nombre_actividad", ""),
-                "descripcion_actividad": rec.get("descripcion_actividad", ""),
-                "responsable": rec.get("responsable", ""),
-                "medios_ver": rec.get("medios_ver", ""),
-                "recursos_actividad": recursos_str,
-                "monto": rec.get("monto", 0),
-                "year": rec.get("year", ""),
-                
-                # Datos Acción (Fijos para todas las filas de este reporte)
-                "uuid_accion": accion.get("uuid_accion", ""),
-                "nombre_accion": accion.get("nombre_accion", ""),
-                "descripcion_accion": accion.get("descripcion", "")
-            }
-            data_procesada.append(fila)
-
-        # 4. Pandas
-        df = pd.DataFrame(data_procesada)
-
-        # 5. Filtrar columnas
-        cols_finales = [c for c in payload.columnas if c in df.columns]
-        if not cols_finales: cols_finales = df.columns.tolist()
-        df = df[cols_finales]
-
-        # 6. Renombrar
-        nombres_bonitos = {
-            "nombre_actividad": "Actividad",
-            "descripcion_actividad": "Desc. Actividad",
-            "recursos_actividad": "Insumos",
-            "nombre_accion": "Acción",
-            "descripcion_accion": "Desc. Acción",
-            "uuid_accion": "UUID Acción"
+        fila = {
+            "nombre_actividad": rec.get("nombre_actividad", ""),
+            "descripcion_actividad": rec.get("descripcion_actividad", ""),
+            "responsable": rec.get("responsable", ""),
+            "medios_ver": rec.get("medios_ver", ""),
+            "recursos_actividad": ", ".join(r_list) if isinstance(r_list, list) else str(r_list),
+            "monto": rec.get("monto", 0),
+            "year": rec.get("year", ""),
+            "uuid_accion": rec.get("uuid_accion", ""),
+            "nombre_accion": padre.get("nombre_accion", "Huérfano"),
+            "descripcion_accion": padre.get("descripcion", ""),
+            "dimension": padre.get("dimension", "")
         }
-        df.rename(columns=nombres_bonitos, inplace=True)
+        data_procesada.append(fila)
+        
+    df = pd.DataFrame(data_procesada)
+    cols = [c for c in payload.columnas if c in df.columns] or df.columns.tolist()
+    df = df[cols]
+    
+    stream = BytesIO()
+    df.to_excel(stream, index=False)
+    stream.seek(0)
+    fname = f"Recursos_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={fname}"})
 
-        stream = BytesIO()
-        df.to_excel(stream, index=False, sheet_name="Detalle Acción")
-        stream.seek(0)
+@app.post("/api/recursos/exportar_custom_accion/{uuid_accion}")
+def exportar_recursos_accion_custom(uuid_accion: str, payload: ExportColumnas):
+    recursos = list(col_recursos.find({"uuid_accion": uuid_accion}))
+    if not recursos: raise HTTPException(404, "No hay recursos en esta acción")
+    
+    accion_padre = col_acciones.find_one({"uuid_accion": uuid_accion}) or {}
+    
+    data_procesada = []
+    for rec in recursos:
+        r_list = rec.get("recursos_actividad", [])
+        fila = {
+            "nombre_actividad": rec.get("nombre_actividad", ""),
+            "descripcion_actividad": rec.get("descripcion_actividad", ""),
+            "responsable": rec.get("responsable", ""),
+            "medios_ver": rec.get("medios_ver", ""),
+            "recursos_actividad": ", ".join(r_list) if isinstance(r_list, list) else str(r_list),
+            "monto": rec.get("monto", 0),
+            "year": rec.get("year", ""),
+            "uuid_accion": uuid_accion,
+            "nombre_accion": accion_padre.get("nombre_accion", ""),
+            "descripcion_accion": accion_padre.get("descripcion", ""),
+            "dimension": accion_padre.get("dimension", "")
+        }
+        data_procesada.append(fila)
+        
+    df = pd.DataFrame(data_procesada)
+    cols = [c for c in payload.columnas if c in df.columns] or df.columns.tolist()
+    df = df[cols]
+    
+    stream = BytesIO()
+    df.to_excel(stream, index=False)
+    stream.seek(0)
+    
+    nom_clean = str(accion_padre.get("nombre_accion", "Accion"))[:15].replace(" ", "_")
+    fname = f"Detalle_{nom_clean}.xlsx"
+    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={fname}"})
 
-        filename = f"Detalle_Accion_{uuid_accion[:8]}.xlsx"
-
-        return StreamingResponse(
-            stream,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-
-    except Exception as e:
-        print(f"Error exportando acción: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==========================================
-# 8. INICIALIZACIÓN
-# ==========================================
-
+# --- Init Users ---
 if not col_users.find_one({"perfil": "administrador"}):
     col_users.insert_one({"perfil": "administrador", "contrasena": "admin123"})
     print(">>> Usuario ADMIN creado")
-
 if not col_users.find_one({"perfil": "usuario"}):
     col_users.insert_one({"perfil": "usuario", "contrasena": "user123"})
-    print(">>> Usuario USUARIO creado")
+    print(">>> Usuario VISITA creado")
 
 if __name__ == "__main__":
     import uvicorn
