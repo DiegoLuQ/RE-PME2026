@@ -14,8 +14,6 @@ services:
       # Pasamos las variables del .env al contenedor
       - MONGO_URI=${MONGO_URI}
       - DB_NAME=${DB_NAME}
-    networks:
-      - red_pme_nueva
 
   # --- FRONTEND HTML ---
   pme_new_frontend:
@@ -28,9 +26,8 @@ services:
       - "${PORT_FRONTEND}:80"
     depends_on:
       - pme_new_backend
-    networks:
-      - red_pme_nueva
 
 networks:
-  red_pme_nueva:
-    driver: bridge  
+  default:
+    name: base_red_pme
+    external: true
