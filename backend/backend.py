@@ -44,7 +44,8 @@ app = FastAPI(title="API Orquestador PME")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # <--- ESTO PERMITE TODO (Para desarrollo)
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
