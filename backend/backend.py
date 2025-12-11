@@ -1,9 +1,10 @@
 import os
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse 
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from pydantic import BaseModel, Field, BeforeValidator, ConfigDict
+from openpyxl import Workbook
 from typing import List, Optional, Annotated
 from datetime import datetime
 from bson import ObjectId
@@ -19,16 +20,22 @@ import certifi
 
 load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
-DB_NAME = os.getenv("DB_NAME", "pme_colegios")
+MONGO_URI = os.getenv("MONGO_URI", "localhost:27017/")
+DB_NAME = os.getenv("DB_NAME", "pme_colegios2")
 
 print(f"🔌 Conectando a: {MONGO_URI}")
 
 
 
 try:
-    # Agregamos tlsCAFile para evitar errores SSL en contenedores
-    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+    # LOGICA: Si es localhost, conectar directo. Si es nube (Atlas), usar certificados.
+    if "localhost" in MONGO_URI or "127.0.0.1" in MONGO_URI:
+        print("🏠 Detectado entorno LOCAL: Conectando sin SSL...")
+        client = MongoClient(MONGO_URI)
+    else:
+        print("☁️ Detectado entorno NUBE: Conectando con certificados SSL...")
+        client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+
     db = client[DB_NAME]
     client.admin.command('ping')
     print("✅ Conexión exitosa a MongoDB")
@@ -334,24 +341,60 @@ def eliminar_accion(uuid: str):
 async def importar_acciones_excel(id_pme: str, year: int, file: UploadFile = File(...)):
     try:
         contents = await file.read()
+        # Leemos el excel y rellenamos nulos con string vacío para evitar errores
         df = pd.read_excel(BytesIO(contents)).fillna("")
-        df.columns = [c.strip().lower().replace(' ', '_').replace('ó','o').replace('é','e').replace('í','i').replace('á','a') for c in df.columns]
+        
+        # Normalización de columnas
+        df.columns = [
+            c.strip().lower()
+            .replace(' ', '_')
+            .replace('ó','o').replace('é','e').replace('í','i').replace('á','a').replace('ú','u')
+            for c in df.columns
+        ]
         
         insert_list = []
         for row in df.to_dict('records'):
-            row["uuid_accion"] = str(uuid.uuid4())
+            # --- NUEVA LÓGICA DE UUID ---
+            # 1. Obtenemos el valor de uuid_accion (si existe) y lo limpiamos
+            uuid_traido = str(row.get("uuid_accion", "")).strip()
+
+            # 2. Si trae texto y no es "nan" (común en pandas), usamos ese.
+            #    Caso contrario, generamos uno nuevo.
+            if uuid_traido and uuid_traido.lower() not in ["nan", "none", ""]:
+                row["uuid_accion"] = uuid_traido
+            else:
+                row["uuid_accion"] = str(uuid.uuid4())
+            # -----------------------------
+
             row["id_pme"] = id_pme
             row["year"] = year
             
-            sub = row.get("subdimensiones", "")
-            row["subdimensiones"] = [s.strip() for s in sub.split(',')] if sub else []
+            # Tratamiento de subdimensiones
+            sub = str(row.get("subdimensiones", ""))
+            # Agregamos validación extra para que no falle si sub es "nan"
+            if sub and sub.lower() not in ["nan", "none"]:
+                row["subdimensiones"] = [s.strip() for s in sub.split(',')]
+            else:
+                row["subdimensiones"] = []
+
+            # Limpieza de montos
+            try:
+                row["monto_sep"] = int(str(row.get("monto_sep", 0)).replace('.', '').replace('$', ''))
+            except: row["monto_sep"] = 0
+            
+            try:
+                row["monto_total"] = int(str(row.get("monto_total", 0)).replace('.', '').replace('$', ''))
+            except: row["monto_total"] = 0
 
             try:
+                # Validamos contra el esquema
                 acc = Schema_Acciones(**row)
                 acc_dict = acc.model_dump(by_alias=True, exclude={"id"})
                 acc_dict["_id"] = str(ObjectId())
                 insert_list.append(acc_dict)
-            except: continue
+            except Exception as e: 
+                print(f"Fila saltada por error validación: {e}")
+                continue
 
         if insert_list:
             res = col_acciones.insert_many(insert_list)
@@ -360,7 +403,7 @@ async def importar_acciones_excel(id_pme: str, year: int, file: UploadFile = Fil
 
     except Exception as e:
         print(f"Error importación: {e}")
-        raise HTTPException(status_code=500, detail="Error interno")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/acciones/exportar/{id_pme}")
 def exportar_acciones_excel(id_pme: str):
@@ -418,31 +461,66 @@ async def importar_recursos_excel(id_pme: str, year: int, file: UploadFile = Fil
     try:
         contents = await file.read()
         df = pd.read_excel(BytesIO(contents)).fillna("")
-        df.columns = [c.strip().lower().replace(' ', '_').replace('ó','o').replace('descripción','descripcion') for c in df.columns]
+        
+        # Normalización de columnas
+        df.columns = [
+            c.strip().lower()
+            .replace(' ', '_')
+            .replace('ó','o').replace('é','e').replace('í','i').replace('á','a').replace('ú','u')
+            .replace('descripción','descripcion') 
+            for c in df.columns
+        ]
         
         insert_list = []
         for row in df.to_dict('records'):
             row.update({"id_pme": id_pme, "year": year})
+            
+            # --- LOGICA UUID_ACCION ---
+            # 1. Buscamos si existe la columna uuid_accion en el excel
             uuid_traido = str(row.get("uuid_accion", "")).strip()
-            row["uuid_accion"] = uuid_traido if uuid_traido and uuid_traido.lower() != "nan" else "sin asignar"
             
-            rs = row.get("recursos_actividad", row.get("insumos", ""))
-            row["recursos_actividad"] = [s.strip() for s in rs.split(',')] if rs else []
+            # 2. Si existe y no es "nan" ni vacío, lo usamos.
+            #    Si NO existe o está vacío, asignamos "sin asignar" (se crea el recurso igual)
+            if uuid_traido and uuid_traido.lower() not in ["nan", "none", ""]:
+                row["uuid_accion"] = uuid_traido
+            else:
+                row["uuid_accion"] = "sin asignar"
             
+            # Tratamiento de lista de recursos (insumos)
+            # Acepta columna 'recursos_actividad' o 'insumos'
+            rs = str(row.get("recursos_actividad", row.get("insumos", "")))
+            row["recursos_actividad"] = [s.strip() for s in rs.split(',')] if rs and rs.lower() != "nan" else []
+            
+            # Limpieza de monto
+            try:
+                row["monto"] = int(str(row.get("monto", 0)).replace('.', '').replace('$', ''))
+            except: row["monto"] = 0
+
             try:
                 res_obj = Schema_Recursos(**row)
                 res_dict = res_obj.model_dump(by_alias=True, exclude={"id"})
                 res_dict["_id"] = str(ObjectId())
                 insert_list.append(res_dict)
-            except: continue
+            except Exception as e: 
+                print(f"Error fila recurso: {e}")
+                continue
 
         if insert_list:
             res = col_recursos.insert_many(insert_list)
-            return {"msg": "Importado", "total_registrados": len(res.inserted_ids), "huérfanos": sum(1 for x in insert_list if x["uuid_accion"] == "sin asignar")}
-        return {"msg": "Sin datos", "total_registrados": 0}
+            # Contamos cuántos quedaron huérfanos para avisar al usuario
+            huerfanos = sum(1 for x in insert_list if x["uuid_accion"] == "sin asignar")
+            return {
+                "msg": "Importado correctamente", 
+                "total_registrados": len(res.inserted_ids), 
+                "huérfanos": huerfanos,
+                "nota": "Los recursos huérfanos se crearon pero deben asociarse manualmente."
+            }
+        return {"msg": "Sin datos válidos", "total_registrados": 0}
+
     except Exception as e:
         print(f"Error importacion recursos: {e}")
         raise HTTPException(500, str(e))
+
 
 @app.post("/api/recursos/exportar_custom/{id_pme}")
 def exportar_recursos_custom(id_pme: str, payload: ExportColumnas):
@@ -519,6 +597,7 @@ def exportar_recursos_accion_custom(uuid_accion: str, payload: ExportColumnas):
     fname = f"Detalle_{nom_clean}.xlsx"
     return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f"attachment; filename={fname}"})
 
+    
 # --- Init Users ---
 if not col_users.find_one({"perfil": "administrador"}):
     col_users.insert_one({"perfil": "administrador", "contrasena": "admin123"})
