@@ -443,11 +443,28 @@ def crear_recurso(recurso: Schema_Recursos):
 
 @app.put("/api/recursos/{id_recurso}")
 def modificar_recurso(id_recurso: str, recurso: Schema_Recursos):
+    # Preparamos los datos a actualizar
     update_data = recurso.model_dump(exclude_unset=True, exclude={"id"})
+    
+    # INTENTO 1: Buscar por ObjectId (Estándar de MongoDB)
     try:
-        col_recursos.update_one({"_id": ObjectId(id_recurso)}, {"$set": update_data})
-        return {"msg": "Recurso actualizado"}
-    except: raise HTTPException(400, "ID inválido")
+        res = col_recursos.update_one({"_id": ObjectId(id_recurso)}, {"$set": update_data})
+        if res.matched_count > 0:
+            return {"msg": "Recurso actualizado (ObjectId)"}
+    except Exception as e:
+        # Si el ID no tiene formato válido de ObjectId, fallará el constructor, ignoramos y pasamos al Intento 2
+        pass 
+
+    # INTENTO 2: Buscar por String (Común en datos importados donde forzamos str(ObjectId))
+    res = col_recursos.update_one({"_id": id_recurso}, {"$set": update_data})
+    
+    if res.matched_count > 0:
+        return {"msg": "Recurso actualizado (String)"}
+    
+    # Si llega aquí, es que no encontró nada de ninguna forma
+    print(f"⚠️ ALERTA: Se intentó actualizar ID {id_recurso} pero no existe en la BD.")
+    # Retornamos 200 con advertencia para no romper el front, pero sabiendo que falló
+    return {"msg": "No se realizaron cambios (ID no encontrado)"}
 
 @app.delete("/api/recursos/{id_recurso}")
 def eliminar_recurso(id_recurso: str):
