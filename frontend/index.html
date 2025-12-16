@@ -173,7 +173,7 @@
         >
           <span class="text-xl">📦</span>
           <span class="sidebar-text group-hover:text-white"
-            >Recursos (Global)</span
+            >Actividades (Global)</span
           >
         </button>
         <button
@@ -535,7 +535,7 @@
           class="mb-6 flex flex-col md:flex-row justify-between items-end gap-4"
         >
           <div>
-            <h2 class="text-3xl font-bold text-gray-800">Inventario Global</h2>
+            <h2 class="text-3xl font-bold text-gray-800">Inventario de Actividades</h2>
             <p class="text-gray-500 text-sm mt-1">
               Actividades del PME.
             </p>
@@ -1405,292 +1405,190 @@
     </div>
 
     <!-- MODAL PREVISUALIZACIÓN CERTIFICADO (CORREGIDO SCROLL) -->
+<!-- MODAL PREVISUALIZACIÓN CERTIFICADO -->
 <div id="modal-certificado" class="fixed inset-0 bg-gray-900 bg-opacity-90 hidden z-[100] overflow-y-auto items-start justify-center pt-10 pb-10">
-    
-    <!-- Contenedor del contenido (Sin márgenes extraños, solo el ancho) -->
-    <div class="relative w-full max-w-4xl flex flex-col items-center">
-        
-        <!-- BARRA SUPERIOR FLOTANTE -->
-        <div class="w-full flex justify-between items-center mb-4 px-4">
-            <h2 class="text-white text-xl font-bold">Vista Previa del Documento</h2>
-            <button onclick="cerrarModalCertificado()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
-        </div>
+  <div class="relative w-full max-w-4xl flex flex-col items-center">
+      
+      <!-- BARRA SUPERIOR -->
+      <div class="w-full flex justify-between items-center mb-4 px-4">
+          <h2 class="text-white text-xl font-bold">Vista Previa del Documento</h2>
+          <button onclick="cerrarModalCertificado()" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+      </div>
 
-        <!-- EL PAPEL (Tamaño Carta) -->
-        <div id="certificado-content" class="bg-white w-[216mm] min-h-[279mm] p-12 shadow-2xl text-gray-800 font-serif relative mx-auto flex flex-col">
-            
-            <!-- ENCABEZADO -->
-            <div class="mb-8">
-            
-              <!-- GRID: 2 Filas x 3 Columnas -->
+      <!-- EL PAPEL (Tamaño Carta) -->
+      <div id="certificado-content" class="bg-white w-[216mm] min-h-[279mm] p-12 shadow-2xl text-gray-800 font-serif relative mx-auto flex flex-col">
+          
+          <!-- ENCABEZADO: GRID 2x3 -->
+          <div class="mb-6">
               <div class="grid grid-cols-3 gap-2 mb-2">
-                  
-                  <!-- [Fila 1, Col 1] Logo (Un poco más pequeño: w-20) -->
+                  <!-- Fila 1, Col 1: Logo -->
                   <div class="flex items-start justify-start">
-                      <img id="pdf-header-logo" 
-                           src="" 
-                           class="w-20 h-20 object-contain" 
-                           alt="Logo Colegio"
-                           onerror="this.style.display='none'">
+                      <img id="pdf-header-logo" src="" class="w-20 h-20 object-contain" alt="Logo" onerror="this.style.display='none'">
                   </div>
-  
-                  <!-- [Fila 1, Col 2] Vacío -->
+                  <!-- Fila 1, Col 2: Vacío -->
                   <div></div>
-  
-                  <!-- [Fila 1, Col 3] Datos Colegio (Letra delgada y pequeña) -->
+                  <!-- Fila 1, Col 3: Datos Colegio (Texto Fino) -->
                   <div class="text-right font-sans text-gray-600">
-                      <!-- Nombre: font-medium (no bold), text-sm -->
-                      <h2 class="font-medium text-gray-800 text-sm uppercase tracking-tight" id="pdf-header-colegio">NOMBRE COLEGIO</h2>
-                      <!-- Dirección: font-light (delgada), text-xs -->
-                      <div class="text-[10px] leading-tight font-light mt-1">
+                      <h2 class="font-bold text-gray-800 text-sm uppercase tracking-tight" id="pdf-header-colegio">NOMBRE COLEGIO</h2>
+                      <div class="text-[10px] leading-tight font-light mt-1 text-gray-500">
                           <p id="pdf-header-direccion">Dirección...</p>
                           <p id="pdf-header-telefono">Teléfono...</p>
+                          <p class="mt-0.5">RBD: <span id="pdf-header-rbd"></span> | RUT: <span id="pdf-header-rut"></span></p>
                       </div>
                   </div>
-  
-                  <!-- [Fila 2, Col 1] Vacío -->
+
+                  <!-- Fila 2, Col 1: Vacío -->
                   <div></div>
-  
-                  <!-- [Fila 2, Col 2] Vacío -->
+                  <!-- Fila 2, Col 2: Vacío -->
                   <div></div>
-  
-                  <!-- [Fila 2, Col 3] PME AÑO (Letra Serif, tamaño moderado) -->
+                  <!-- Fila 2, Col 3: PME AÑO -->
                   <div class="text-right flex items-end justify-end">
-                      <h1 class="text-xl font-serif font-semibold text-gray-800 tracking-wide">
+                      <h1 class="text-xl font-serif font-bold text-gray-800 tracking-wide">
                           PME <span id="pdf-header-year">202X</span>
                       </h1>
                   </div>
-  
               </div>
-  
-              <!-- LÍNEA SEPARADORA (Gris suave, ancho completo) -->
-              <div class="border-b border-gray-300 w-full mb-8 mt-2"></div>
-  
-              <!-- TÍTULO DEL CERTIFICADO (Centrado, Serif, peso medio) -->
-              <div class="text-center">
-                  <h1 class="text-2xl font-serif font-medium text-black tracking-wide">
+
+              <!-- LÍNEA DIVISORIA -->
+              <div class="border-b-2 border-gray-800 w-full mb-6 mt-2"></div>
+
+              <!-- TÍTULO CERTIFICADO -->
+              <div class="text-center mb-8">
+                  <h1 class="text-2xl font-serif font-bold text-black uppercase tracking-wider decoration-double underline decoration-gray-300 underline-offset-4">
                       Certificado de Acción SEP
                   </h1>
               </div>
-  
           </div>
 
-            <!-- CUERPO -->
-            <div class="flex-1 px-4">
+          <!-- CUERPO DEL CERTIFICADO -->
+          <div class="flex-1 px-4">
+              <p class="mb-6 text-sm text-justify font-sans text-gray-700">
+                  El Director del establecimiento certifica que la siguiente acción y sus actividades se encuentran debidamente registradas en la plataforma de gestión:
+              </p>
 
-    <table class="w-full text-xs md:text-sm font-serif leading-normal">
-        
-        <!-- 1. DIMENSIÓN -->
-        <tr id="pdf-row-dimension" class="border-b border-gray-100">
-            <td class="align-top font-bold text-gray-700 py-2 w-40">Dimensión</td>
-            <td class="align-top py-2 w-4">:</td>
-            <td class="align-top py-2 capitalize" id="pdf-dimension">...</td>
-        </tr>
+              <table class="w-full text-xs md:text-sm font-serif leading-relaxed">
+                  <!-- Dimensión -->
+                  <tr id="pdf-row-dimension" class="border-b border-gray-100">
+                      <td class="align-top font-bold text-gray-700 py-2 w-40">Dimensión</td>
+                      <td class="align-top py-2 w-4">:</td>
+                      <td class="align-top py-2 capitalize" id="pdf-dimension">...</td>
+                  </tr>
+                  <!-- Subdimensión -->
+                  <tr id="pdf-row-subdimension" class="border-b border-gray-100">
+                      <td class="align-top font-bold text-gray-700 py-2">Subdimensión</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 capitalize" id="pdf-subdimension">...</td>
+                  </tr>
 
-        <!-- 2. SUBDIMENSIÓN -->
-        <tr id="pdf-row-subdimension" class="border-b border-gray-100">
-            <td class="align-top font-bold text-gray-700 py-2">Subdimensión</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 capitalize" id="pdf-subdimension">...</td>
-        </tr>
+                  <tr><td colspan="3" class="py-2"></td></tr>
 
-        <!-- Espaciador -->
-        <tr><td colspan="3" class="py-2"></td></tr>
+                  <!-- Acción -->
+                  <tr id="pdf-row-accion-nombre" class="bg-gray-50">
+                      <td class="align-top font-bold text-gray-800 py-2 pl-2">Nombre Acción</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 font-semibold text-blue-900 uppercase pr-2" id="pdf-nombre-accion">...</td>
+                  </tr>
+                  <tr id="pdf-row-accion-desc">
+                      <td class="align-top font-bold text-gray-700 py-2 pl-2">Desc. Acción</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 text-justify text-gray-600 italic pr-2" id="pdf-desc-accion">...</td>
+                  </tr>
 
-        <!-- 3. NOMBRE ACCIÓN -->
-        <tr id="pdf-row-accion-nombre" class="bg-gray-50">
-            <td class="align-top font-bold text-gray-800 py-2 pl-2">Nombre Acción</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 font-semibold text-blue-900 uppercase pr-2" id="pdf-nombre-accion">...</td>
-        </tr>
+                  <tr><td colspan="3" class="py-2"></td></tr>
 
-        <!-- 4. DESCRIPCIÓN ACCIÓN -->
-        <tr id="pdf-row-accion-desc">
-            <td class="align-top font-bold text-gray-700 py-2 pl-2">Desc. Acción</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 text-justify text-gray-600 italic pr-2" id="pdf-desc-accion">...</td>
-        </tr>
+                  <!-- Actividad -->
+                  <tr id="pdf-row-actividad-nombre" class="bg-gray-50">
+                      <td class="align-top font-bold text-gray-800 py-2 pl-2">Actividad</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 font-bold uppercase pr-2" id="pdf-nombre-actividad">...</td>
+                  </tr>
+                  <tr id="pdf-row-actividad-desc">
+                      <td class="align-top font-bold text-gray-700 py-2 pl-2">Desc. Actividad</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 text-justify pr-2" id="pdf-desc-actividad">...</td>
+                  </tr>
+                  
+                  <!-- Insumos y Monto -->
+                  <tr id="pdf-row-recursos">
+                      <td class="align-top font-bold text-gray-700 py-2 pl-2">Insumos/Recursos</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 text-xs text-gray-600" id="pdf-lista-recursos">...</td>
+                  </tr>
+                  <tr id="pdf-row-monto">
+                      <td class="align-top font-bold text-gray-700 py-2 pl-2">Monto Valorizado</td>
+                      <td class="align-top py-2">:</td>
+                      <td class="align-top py-2 font-mono font-bold text-black" id="pdf-monto">...</td>
+                  </tr>
+              </table>
+          </div>
 
-        <!-- Espaciador -->
-        <tr><td colspan="3" class="py-2"></td></tr>
+          <!-- PIE DE PÁGINA -->
+          <div class="mt-auto w-full px-8 font-serif text-gray-800">
+              <div id="pdf-footer-bloque" class="flex justify-between items-end mb-4">
+                  <div class="text-lg text-gray-700 mb-6 tracking-wide" id="pdf-ciudad">Alto Hospicio</div>
+                  <div class="flex items-center gap-4">
+                      <div class="text-center leading-tight">
+                          <div class="border-b border-black w-48 mb-1"></div>
+                          <p class="font-bold text-gray-900 text-sm" id="pdf-firma-director">Director(a)</p>
+                          <p class="text-gray-500 text-xs italic">Firma y Timbre</p>
+                      </div>
+                       <img id="pdf-footer-logo" src="" class="w-16 h-16 object-contain opacity-80" alt="Insignia" onerror="this.style.display='none'">
+                  </div>
+              </div>
+              
+              <div class="border-t border-gray-300 pt-2 text-center">
+                  <p class="font-bold text-xs text-gray-600 uppercase" id="pdf-footer-nombre">Establecimiento...</p>
+                  <p class="text-[9px] font-sans text-gray-400" id="pdf-footer-direccion">Dirección...</p>
+                  <p class="text-[8px] text-gray-300 font-sans mt-1">UUID Documento: <span id="pdf-uuid"></span></p>
+              </div>
+          </div>
+      </div>
 
-        <!-- 5. NOMBRE ACTIVIDAD -->
-        <tr id="pdf-row-actividad-nombre" class="bg-gray-50">
-            <td class="align-top font-bold text-gray-800 py-2 pl-2">Actividad</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 font-bold uppercase pr-2" id="pdf-nombre-actividad">...</td>
-        </tr>
-
-        <!-- 6. DESCRIPCIÓN ACTIVIDAD -->
-        <tr id="pdf-row-actividad-desc">
-            <td class="align-top font-bold text-gray-700 py-2 pl-2">Desc. Actividad</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 text-justify pr-2" id="pdf-desc-actividad">...</td>
-        </tr>
-        
-        <!-- EXTRAS (Recursos y Monto) -->
-        <tr id="pdf-row-recursos">
-            <td class="align-top font-bold text-gray-700 py-2 pl-2">Insumos</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 text-xs" id="pdf-lista-recursos">...</td>
-        </tr>
-
-        <tr id="pdf-row-monto">
-            <td class="align-top font-bold text-gray-700 py-2 pl-2">Monto</td>
-            <td class="align-top py-2">:</td>
-            <td class="align-top py-2 font-mono font-bold text-black" id="pdf-monto">...</td>
-        </tr>
-    </table>
-</div>
-            <!-- PIE DE PÁGINA -->
-            <div class="absolute bottom-12 left-0 w-full px-16 font-serif text-gray-800">
-                <div id="pdf-footer-bloque" class="flex justify-between items-end mb-2">
-                    <div class="text-xl text-gray-700 mb-4 tracking-wide" id="pdf-ciudad">Alto Hospicio</div>
-                    <div class="flex items-center gap-4">
-                        <img id="pdf-footer-logo" 
-         src="" 
-         class="w-20 h-20 object-contain" 
-         alt="Insignia"
-         onerror="this.src='https://cdn-icons-png.flaticon.com/512/201/201614.png'"><div class="text-left leading-tight">
-                            <p class="font-bold text-gray-900 text-lg" id="pdf-firma-director">Director(a)</p>
-                            <p class="text-blue-900 text-sm font-bold my-0.5">Director</p>
-                            <p class="text-xs text-gray-500 italic" id="pdf-firma-colegio">Establecimiento</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="border-t-2 border-gray-300 mb-1"></div>
-                <div class="border-t border-gray-200 mb-4"></div>
-                <div class="text-center text-sm text-gray-800"><p class="font-bold italic mb-1" id="pdf-footer-nombre">Establecimiento...</p><p class="text-xs font-sans text-gray-600" id="pdf-footer-direccion">Dirección...</p></div>
-                <div class="text-center mt-2"><p class="text-[8px] text-gray-300 font-sans">UUID: <span id="pdf-uuid"></span></p></div>
-            </div>
-        </div>
-
-        <!-- BOTONES -->
-        <div class="flex gap-4 mt-6">
-            <button onclick="cerrarModalCertificado()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">Cancelar</button>
-            <button onclick="descargarCertificadoPDF()" id="btn-download-pdf" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg flex items-center gap-2 transition transform hover:scale-105">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Descargar PDF
-            </button>
-        </div>
-
-    </div>
+      <!-- BOTONES -->
+      <div class="flex gap-4 mt-6 mb-8">
+          <button onclick="cerrarModalCertificado()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">Cancelar</button>
+          <button onclick="descargarCertificadoPDF()" id="btn-download-pdf" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg flex items-center gap-2 transition transform hover:scale-105">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> 
+              Descargar PDF
+          </button>
+      </div>
+  </div>
 </div>
 
     <!-- Modal Exportar Recursos -->
-    <div
-      id="modal-exportar-recursos"
-      class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm"
-    >
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
-        <div
-          class="p-4 border-b bg-indigo-50 flex justify-between items-center"
-        >
-          <h3 class="text-lg font-bold text-indigo-900">
-            Configurar Reporte Excel
-          </h3>
-          <button
-            onclick="cerrarModalExportarRecursos()"
-            class="text-gray-400 hover:text-red-500 font-bold"
-          >
-            &times;
-          </button>
-        </div>
-        <div class="p-6">
-          <p class="text-sm text-gray-600 mb-4">Selecciona las columnas:</p>
-          <form
-            id="form-export-cols"
-            class="grid grid-cols-2 gap-3 text-sm text-gray-700"
-          >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="nombre_actividad"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Actividad</label
-            >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="descripcion_actividad"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Desc. Actividad</label
-            >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="recursos_actividad"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Insumos</label
-            >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="responsable"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Responsable</label
-            >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="monto"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Monto</label
-            >
-            <div class="col-span-2 border-t my-2"></div>
-            <label class="flex items-center gap-2 font-semibold text-indigo-700"
-              ><input
-                type="checkbox"
-                value="nombre_accion"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Nombre Acción</label
-            >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="descripcion_accion"
-                checked
-                class="w-4 h-4 text-indigo-600"
-              />
-              Desc. Acción</label
-            >
-            <label class="flex items-center gap-2"
-              ><input
-                type="checkbox"
-                value="dimension"
-                class="w-4 h-4 text-indigo-600"
-              />
-              Dimensión</label
-            >
-          </form>
-        </div>
-        <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
-          <button
-            onclick="cerrarModalExportarRecursos()"
-            class="px-4 py-2 rounded border hover:bg-gray-100 font-bold"
-          >
-            Cancelar</button
-          ><button
-            onclick="descargarExcelRecursos()"
-            id="btn-descargar-rec"
-            class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold shadow"
-          >
-            Descargar Excel
-          </button>
-        </div>
-      </div>
+<!-- Modal Exportar Recursos -->
+<div id="modal-exportar-recursos" class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">
+    <div class="p-4 border-b bg-indigo-50 flex justify-between items-center">
+      <h3 class="text-lg font-bold text-indigo-900">Configurar Reporte Excel</h3>
+      <button onclick="cerrarModalExportarRecursos()" class="text-gray-400 hover:text-red-500 font-bold">&times;</button>
     </div>
+    <div class="p-6">
+      <p class="text-sm text-gray-600 mb-4">Selecciona las columnas:</p>
+      <form id="form-export-cols" class="grid grid-cols-2 gap-3 text-sm text-gray-700">
+        <label class="flex items-center gap-2"><input type="checkbox" value="nombre_actividad" checked class="w-4 h-4 text-indigo-600"/> Actividad</label>
+        <label class="flex items-center gap-2"><input type="checkbox" value="recursos_actividad" checked class="w-4 h-4 text-indigo-600"/> Insumos</label>
+        <label class="flex items-center gap-2"><input type="checkbox" value="responsable" checked class="w-4 h-4 text-indigo-600"/> Responsable</label>
+        <label class="flex items-center gap-2"><input type="checkbox" value="monto" checked class="w-4 h-4 text-indigo-600"/> Monto</label>
+        
+        <div class="col-span-2 border-t my-2"></div>
+        
+        <label class="flex items-center gap-2 font-semibold text-indigo-700"><input type="checkbox" value="nombre_accion" checked class="w-4 h-4 text-indigo-600"/> Nombre Acción</label>
+        <label class="flex items-center gap-2"><input type="checkbox" value="descripcion_accion" checked class="w-4 h-4 text-indigo-600"/> Desc. Acción</label>
+        <label class="flex items-center gap-2"><input type="checkbox" value="dimension" class="w-4 h-4 text-indigo-600"/> Dimensión</label>
+        
+        <!-- AÑADIDO: Checkbox UUID -->
+        <label class="flex items-center gap-2 text-gray-500"><input type="checkbox" value="uuid_accion" class="w-4 h-4 text-indigo-600"/> UUID Acción</label>
+      </form>
+    </div>
+    <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+      <button onclick="cerrarModalExportarRecursos()" class="px-4 py-2 rounded border hover:bg-gray-100 font-bold">Cancelar</button>
+      <button onclick="descargarExcelRecursos()" id="btn-descargar-rec" class="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold shadow">Descargar Excel</button>
+    </div>
+  </div>
+</div>
+
+
     </div>
     <div id="modal-exportar-accion" class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 backdrop-blur-sm">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-md modal-enter">

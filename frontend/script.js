@@ -685,6 +685,11 @@ async function cargarRecursos(uuidAccion) {
     tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">Cargando...</td></tr>`;
     try {
         const data = await apiCall(`/recursos/${uuidAccion}`);
+        
+        // --- CAMBIO IMPORTANTE: Guardamos en memoria ---
+        AppState.recursosDetalle = data; 
+        // -----------------------------------------------
+
         tbody.innerHTML = "";
         if (data.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-400">No hay actividades.</td></tr>`;
@@ -705,11 +710,9 @@ async function cargarRecursos(uuidAccion) {
                 <td class="p-4 text-sm text-gray-600 w-1/3">${htmlRecursos}</td>
                 <td class="p-4 text-sm text-gray-600">${rec.responsable || "S/I"}</td>
                 <td class="p-4 text-sm font-mono text-gray-700">$${monto}</td>
-                <td class="p-4 text-center">
-                    <div class="flex justify-center gap-2 items-center">
-                        <button onclick="abrirModalInsumo('${rec._id}')" class="bg-cyan-100 text-cyan-700 hover:bg-cyan-200 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Agregar Insumo"><span>+</span> Insumo</button>
-                        <button onclick="eliminarRecurso('${rec._id}')" class="admin-only bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">Eliminar</button>
-                    </div>
+                <td class="p-4 text-center flex justify-center gap-2">
+                    <button onclick="abrirModalInsumo('${rec._id}')" class="bg-cyan-100 text-cyan-700 hover:bg-cyan-200 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1" title="Agregar Insumo"><span>+</span> Insumo</button>
+                    <button onclick="eliminarRecurso('${rec._id}')" class="admin-only bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded text-xs font-bold transition">Eliminar</button>
                 </td>`;
             tbody.appendChild(tr);
         });
@@ -959,8 +962,32 @@ async function guardarAsociacion(e) {
 
 // --- Insumo Rápido ---
 function abrirModalInsumo(idActividad) {
+    // 1. Buscar en Globales
+    let recurso = null;
+    if (AppState.recursosGlobales && AppState.recursosGlobales.length > 0) {
+        recurso = AppState.recursosGlobales.find(r => r._id === idActividad);
+    }
+    
+    // 2. Si no está en globales, buscar en Detalle (recursos de la acción actual)
+    if (!recurso && AppState.recursosDetalle && AppState.recursosDetalle.length > 0) {
+        recurso = AppState.recursosDetalle.find(r => r._id === idActividad);
+    }
+
+    if (!recurso) {
+        alert("Error: No se pudo localizar la actividad en memoria. Por favor recarga la página.");
+        return;
+    }
+
+    // Guardamos el objeto completo para usarlo al guardar
+    AppState.recursoEnEdicion = recurso;
+
     setVal("ins-id-actividad", idActividad);
-    setVal("ins-nombre", "");
+    setVal("ins-nombre", ""); // Limpiar input
+    
+    // Título opcional para saber qué estamos editando
+    const label = document.querySelector("#modal-insumo h3");
+    if(label) label.textContent = `Agregar a: ${recurso.nombre_actividad.substring(0, 20)}...`;
+
     toggleModal("modal-insumo", true);
 }
 
@@ -968,23 +995,57 @@ async function guardarNuevoInsumo(e) {
     e.preventDefault();
     const idActividad = val("ins-id-actividad");
     const nuevoInsumo = val("ins-nombre").trim();
-    if (!nuevoInsumo) return;
+    
+    if (!nuevoInsumo) return alert("Debes escribir el nombre del insumo.");
+    if (!AppState.recursoEnEdicion || AppState.recursoEnEdicion._id !== idActividad) {
+        return alert("Error de consistencia de datos. Cierra y vuelve a intentar.");
+    }
+
+    const btn = e.submitter || e.target.querySelector("button[type='submit']");
+    const txtOriginal = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = "...";
 
     try {
-        const resList = await apiCall(`/recursos/${AppState.accionSeleccionada.uuid_accion}`);
-        const recursoActual = resList.find(r => r._id === idActividad);
-        if(!recursoActual) return alert("Error localizando actividad");
+        // Clonamos el objeto para no mutar el estado directamente aún
+        const recursoActualizado = { ...AppState.recursoEnEdicion };
 
-        const lista = recursoActual.recursos_actividad || [];
+        // Aseguramos que sea un array
+        const lista = Array.isArray(recursoActualizado.recursos_actividad) 
+                      ? [...recursoActualizado.recursos_actividad] 
+                      : [];
+        
+        // Agregamos el nuevo insumo
         lista.push(nuevoInsumo);
+        recursoActualizado.recursos_actividad = lista;
 
-        const payload = { ...recursoActual, recursos_actividad: lista };
+        // Limpiamos el ID para enviarlo al PUT (Backend no espera _id en el body usualmente)
+        const payload = { ...recursoActualizado };
         delete payload._id;
 
+        // Enviamos al Backend
         await apiCall(`/recursos/${idActividad}`, "PUT", payload);
+        
         toggleModal("modal-insumo", false);
-        cargarRecursos(AppState.accionSeleccionada.uuid_accion);
-    } catch (e) { alert("Error guardando insumo"); }
+
+        // Actualizamos la vista correspondiente
+        const vistaGlobalVisible = !$("view-gestion-recursos").classList.contains("hidden-section");
+        
+        if (vistaGlobalVisible) {
+            cargarTodosRecursos(); // Recargar tabla global
+        } else if (AppState.accionSeleccionada) {
+            cargarRecursos(AppState.accionSeleccionada.uuid_accion); // Recargar tabla detalle
+        } else {
+            // Caso borde: recargar la accion a la que pertenece el recurso editado
+            cargarRecursos(recursoActualizado.uuid_accion);
+        }
+
+    } catch (e) { 
+        alert("Error guardando insumo: " + (e.detail || e)); 
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = txtOriginal;
+        AppState.recursoEnEdicion = null; // Limpieza
+    }
 }
 
 // --- Excel ---
