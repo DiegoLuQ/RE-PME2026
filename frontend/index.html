@@ -1420,31 +1420,63 @@
         <div id="certificado-content" class="bg-white w-[216mm] min-h-[279mm] p-12 shadow-2xl text-gray-800 font-serif relative mx-auto flex flex-col">
             
             <!-- ENCABEZADO -->
-            <div class="border-b-2 border-blue-900 pb-6 mb-8 text-center">
-                <div class="flex justify-center items-center gap-4 mb-3">
-                    <img id="pdf-header-logo" 
-         src="" 
-         class="w-24 h-24 object-contain" 
-         alt="Logo Colegio"
-         onerror="this.style.display='none'">
-                    <div class="text-left">
-                        <h2 class="font-bold text-lg text-gray-900 uppercase tracking-wide" id="pdf-header-colegio">NOMBRE COLEGIO</h2>
-                        <div class="text-xs text-gray-600 font-sans space-y-0.5">
-                            <p>RBD: <span id="pdf-header-rbd">...</span> | RUT: <span id="pdf-header-rut">...</span></p>
-                            <p id="pdf-header-direccion">Dirección...</p>
-                            <p id="pdf-header-telefono">Teléfono...</p>
-                        </div>
-                    </div>
-                </div>
-                <h1 class="text-2xl font-bold text-blue-900 uppercase mt-4">Certificado de Acción SEP</h1>
-                <p class="text-sm text-gray-500 font-bold" id="pdf-header-year">AÑO 202X</p>
-            </div>
+            <div class="mb-8">
+            
+              <!-- GRID: 2 Filas x 3 Columnas -->
+              <div class="grid grid-cols-3 gap-2 mb-2">
+                  
+                  <!-- [Fila 1, Col 1] Logo (Un poco más pequeño: w-20) -->
+                  <div class="flex items-start justify-start">
+                      <img id="pdf-header-logo" 
+                           src="" 
+                           class="w-20 h-20 object-contain" 
+                           alt="Logo Colegio"
+                           onerror="this.style.display='none'">
+                  </div>
+  
+                  <!-- [Fila 1, Col 2] Vacío -->
+                  <div></div>
+  
+                  <!-- [Fila 1, Col 3] Datos Colegio (Letra delgada y pequeña) -->
+                  <div class="text-right font-sans text-gray-600">
+                      <!-- Nombre: font-medium (no bold), text-sm -->
+                      <h2 class="font-medium text-gray-800 text-sm uppercase tracking-tight" id="pdf-header-colegio">NOMBRE COLEGIO</h2>
+                      <!-- Dirección: font-light (delgada), text-xs -->
+                      <div class="text-[10px] leading-tight font-light mt-1">
+                          <p id="pdf-header-direccion">Dirección...</p>
+                          <p id="pdf-header-telefono">Teléfono...</p>
+                      </div>
+                  </div>
+  
+                  <!-- [Fila 2, Col 1] Vacío -->
+                  <div></div>
+  
+                  <!-- [Fila 2, Col 2] Vacío -->
+                  <div></div>
+  
+                  <!-- [Fila 2, Col 3] PME AÑO (Letra Serif, tamaño moderado) -->
+                  <div class="text-right flex items-end justify-end">
+                      <h1 class="text-xl font-serif font-semibold text-gray-800 tracking-wide">
+                          PME <span id="pdf-header-year">202X</span>
+                      </h1>
+                  </div>
+  
+              </div>
+  
+              <!-- LÍNEA SEPARADORA (Gris suave, ancho completo) -->
+              <div class="border-b border-gray-300 w-full mb-8 mt-2"></div>
+  
+              <!-- TÍTULO DEL CERTIFICADO (Centrado, Serif, peso medio) -->
+              <div class="text-center">
+                  <h1 class="text-2xl font-serif font-medium text-black tracking-wide">
+                      Certificado de Acción SEP
+                  </h1>
+              </div>
+  
+          </div>
 
             <!-- CUERPO -->
             <div class="flex-1 px-4">
-    <p class="mb-6 text-sm text-justify">
-        El Director del establecimiento certifica que la siguiente acción y sus actividades se encuentran debidamente registradas:
-    </p>
 
     <table class="w-full text-xs md:text-sm font-serif leading-normal">
         

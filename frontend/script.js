@@ -1,5 +1,5 @@
-const API = "http://186.64.122.223:8001/api"; 
-
+// const API = "http://186.64.122.223:8001/api"; 
+const API = "http://localhost:8000/api";
 // --- UTILIDADES (HELPERS) ---
 const $ = (id) => document.getElementById(id);
 const val = (id) => $(id).value;
@@ -1036,11 +1036,20 @@ async function subirExcelRecursos(e) {
 
     try {
         const url = `/recursos/importar_excel?id_pme=${AppState.idPme}&year=${AppState.year}`;
+        // NOTA: apiCall ya maneja blobs si retorna archivo, pero aqui retorna JSON
         const data = await apiCall(url, "POST", formData, true); 
-        alert(`Éxito: ${data.total_registrados} regs. | Huérfanos: ${data.huérfanos}`);
+        
+        let msg = `✅ Éxito: ${data.total_registrados} registros creados.`;
+        if(data.huérfanos > 0) {
+            msg += `\n⚠️ Advertencia: ${data.huérfanos} actividades quedaron sin asignar (sin UUID Acción).`;
+        }
+        alert(msg);
+        
         toggleModal("modal-importar-recursos", false);
         cargarTodosRecursos();
-    } catch (e) { alert("Error: " + (e.detail || e)); }
+    } catch (e) { 
+        alert("Error: " + (e.detail || e)); 
+    }
     finally { btn.disabled = false; }
 }
 
