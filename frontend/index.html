@@ -1462,10 +1462,6 @@
 
           <!-- CUERPO DEL CERTIFICADO -->
           <div class="flex-1 px-4">
-              <p class="mb-6 text-sm text-justify font-sans text-gray-700">
-                  El Director del establecimiento certifica que la siguiente acción y sus actividades se encuentran debidamente registradas en la plataforma de gestión:
-              </p>
-
               <table class="w-full text-xs md:text-sm font-serif leading-relaxed">
                   <!-- Dimensión -->
                   <tr id="pdf-row-dimension" class="border-b border-gray-100">
@@ -1523,25 +1519,44 @@
           </div>
 
           <!-- PIE DE PÁGINA -->
-          <div class="mt-auto w-full px-8 font-serif text-gray-800">
-              <div id="pdf-footer-bloque" class="flex justify-between items-end mb-4">
-                  <div class="text-lg text-gray-700 mb-6 tracking-wide" id="pdf-ciudad">Alto Hospicio</div>
-                  <div class="flex items-center gap-4">
-                      <div class="text-center leading-tight">
-                          <div class="border-b border-black w-48 mb-1"></div>
-                          <p class="font-bold text-gray-900 text-sm" id="pdf-firma-director">Director(a)</p>
-                          <p class="text-gray-500 text-xs italic">Firma y Timbre</p>
-                      </div>
-                       <img id="pdf-footer-logo" src="" class="w-16 h-16 object-contain opacity-80" alt="Insignia" onerror="this.style.display='none'">
-                  </div>
-              </div>
-              
-              <div class="border-t border-gray-300 pt-2 text-center">
-                  <p class="font-bold text-xs text-gray-600 uppercase" id="pdf-footer-nombre">Establecimiento...</p>
-                  <p class="text-[9px] font-sans text-gray-400" id="pdf-footer-direccion">Dirección...</p>
-                  <p class="text-[8px] text-gray-300 font-sans mt-1">UUID Documento: <span id="pdf-uuid"></span></p>
-              </div>
-          </div>
+          <div class="mt-auto w-full px-8 font-serif text-black pb-4">
+                
+            <!-- Bloque Superior: Ciudad y Firma -->
+            <div class="flex justify-between items-end mb-3">
+                
+                <!-- Izquierda: Ciudad -->
+                <div class="text-xl text-black mb-2" id="pdf-ciudad">
+                    Alto Hospicio
+                </div>
+
+                <!-- Derecha: Bloque Firma -->
+                <div class="flex items-center gap-3">
+                    <!-- Logo a la izquierda del texto -->
+                    <img id="pdf-footer-logo" 
+                         src="" 
+                         class="w-16 h-16 object-contain" 
+                         alt="Insignia"
+                         onerror="this.style.display='none'">
+                    
+                    <!-- Texto Firma -->
+                    <div class="text-left leading-tight">
+                        <p class="font-bold text-black text-sm" id="pdf-firma-director">Director Name</p>
+                        <p class="text-xs text-black font-medium">Director</p>
+                        <p class="text-[11px] italic text-black" id="pdf-firma-colegio">Nombre Entidad...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Línea Separadora (Fina y Gris Claro) -->
+            <div class="border-t border-gray-300 w-full mb-2"></div>
+
+            <!-- Bloque Inferior: Datos Entidad Centrados -->
+            <div class="text-center">
+                <p class="font-bold italic text-sm text-black" id="pdf-footer-nombre">Fundación Educacional...</p>
+                <p class="text-xs font-bold text-black" id="pdf-footer-direccion">Dirección y Fono...</p>
+            </div>
+
+        </div>
       </div>
 
       <!-- BOTONES -->
