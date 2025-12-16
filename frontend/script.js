@@ -1,5 +1,5 @@
-// const API = "http://186.64.122.223:8001/api"; 
-const API = "http://localhost:8000/api";
+const API = "http://186.64.122.223:8001/api"; 
+// const API = "http://localhost:8000/api";
 // --- UTILIDADES (HELPERS) ---
 const $ = (id) => document.getElementById(id);
 const val = (id) => $(id).value;
